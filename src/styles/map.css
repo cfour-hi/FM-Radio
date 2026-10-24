@@ -1,0 +1,168 @@
+/* 地图控件与画布的深色改造。只覆盖外观，不动交互行为。 */
+
+.map-shell .maplibregl-canvas {
+  outline: none;
+}
+
+.map-shell .maplibregl-canvas:focus-visible {
+  outline: 1px solid var(--color-signal);
+  outline-offset: -1px;
+}
+
+/* 右下角的版权信息：合规要求必须看得见，所以不用折叠成图标 */
+.map-shell .maplibregl-ctrl-attrib {
+  background: rgba(7, 8, 11, 0.78);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin: 0 8px 8px 0;
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--color-line-soft);
+}
+
+.map-shell .maplibregl-ctrl-attrib a {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.map-shell .maplibregl-ctrl-attrib a:hover {
+  color: var(--color-signal);
+}
+
+.map-shell .maplibregl-ctrl-attrib-button {
+  display: none;
+}
+
+/* 地图的边缘压暗：让球体自己沉进夜色，而不是一张铺满屏幕的贴图 */
+.map-vignette {
+  /*
+   * 强度由 WorldMap 按缩放写进这个变量。
+   * 全球视角需要它把球体和窗口边界揉在一起；但放大到地区级之后，
+   * 视野里只剩光点，再压暗就只是在啃食边缘的那几个台了。
+   */
+  opacity: var(--map-vignette, 1);
+  background:
+    radial-gradient(120% 90% at 50% 45%, transparent 42%, rgba(7, 8, 11, 0.82) 100%),
+    linear-gradient(to bottom, rgba(7, 8, 11, 0.45) 0%, transparent 18%, transparent 82%, rgba(7, 8, 11, 0.55) 100%);
+}
+
+/*
+ * 球体明暗（伪光照）。
+ *
+ * 球面是均匀的海洋色，没有受光面和背光面，看起来就是一块扁平的深色圆盘。
+ * 这一层给左上叠一撮冷色高光、右下压一道阴影，让球「鼓」起来——高光中心
+ * 偏左上，落在球体的左上缘，阴影沉向右下，模拟一个左上方来的点光源。
+ *
+ * 只在球体状态有意义：放大到 globe→mercator 过渡（z≥3.6）之后球就没了，
+ * 所以强度由 WorldMap 写进 --map-shading，随缩放淡出，和大气层同进退。
+ */
+.map-shading {
+  opacity: var(--map-shading, 1);
+  background: radial-gradient(
+    ellipse at 32% 28%,
+    rgba(150, 208, 238, 0.22) 0%,
+    rgba(150, 208, 238, 0.07) 32%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+}
+
+/* 选中 / 正在播放的那一个：不受聚合影响，永远画在真实坐标上 */
+.map-ping {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+}
+
+.map-ping-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 999px;
+  background: var(--color-signal);
+  /*
+   * 深色描边不是装饰。全球视角的球面是暗的，纯金色点已经够醒目；
+   * 但飞到城市级之后底图变成浅色，金点会陷进米灰色的陆地里。
+   * 一圈深色轮廓让它在两种底色上都立得住。
+   */
+  box-shadow:
+    0 0 0 1.5px rgba(7, 8, 11, 0.88),
+    0 0 12px rgba(240, 166, 60, 0.9);
+}
+
+.map-ping-ring {
+  position: absolute;
+  inset: 7px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(240, 166, 60, 0.95);
+  box-shadow: 0 0 0 1px rgba(7, 8, 11, 0.5);
+  animation: map-ping 2.4s ease-out infinite;
+}
+
+@keyframes map-ping {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ping-ring {
+    animation: none;
+    transform: scale(0.8);
+    opacity: 0.55;
+  }
+}
+
+/* 太空星云：几团淡色云气垫在星空下面，柔化球外的空旷，给太空一层纵深 */
+.map-nebula {
+  opacity: var(--map-stars, 1);
+  background:
+    radial-gradient(ellipse 46% 28% at 16% 70%, rgba(72, 130, 168, 0.32), transparent 72%),
+    radial-gradient(ellipse 38% 24% at 82% 22%, rgba(104, 88, 158, 0.30), transparent 72%),
+    radial-gradient(ellipse 32% 22% at 72% 84%, rgba(60, 104, 142, 0.28), transparent 72%),
+    radial-gradient(ellipse 28% 18% at 26% 12%, rgba(82, 68, 134, 0.26), transparent 72%),
+    radial-gradient(ellipse 22% 14% at 92% 62%, rgba(66, 120, 156, 0.24), transparent 70%);
+  filter: blur(8px);
+  /*
+   * 球体那一块挖空，但不像过去那样一刀切在半径上。
+   *
+   * --globe-r 现在是每次缩放量出来的实测值，仍然可能差一两个像素（缩放
+   * 动画中间帧、亚像素对齐）。硬边遮罩会把这点误差变成一圈看得见的圆；
+   * 留一段几十像素的过渡，星星从球体边缘往外慢慢浮出来，误差就藏在这段
+   * 渐变里，视觉上也更像「大气层把星光吃掉了」。
+   */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent calc(var(--globe-r, 44vmin) - 30px), black calc(var(--globe-r, 44vmin) + 70px));
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent calc(var(--globe-r, 44vmin) - 30px), black calc(var(--globe-r, 44vmin) + 70px));
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* 太空星空：球体之外的宇宙背景，中心镂空露出球体，随缩放淡出 */
+.map-stars {
+  opacity: var(--map-stars, 1);
+  background-repeat: no-repeat;
+  /* 静态星点由 Starfield 的 Canvas 绘制，遮罩与透明度继续由缩放控制。 */
+  /*
+   * 和星云同一套镂空：球体那块挖掉，边缘留一段渐变让星星淡入。
+   * 半径是 WorldMap 每次缩放后实测的球体轮廓半径（见 syncGlobeRadius）。
+   */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent calc(var(--globe-r, 44vmin) - 2px), black calc(var(--globe-r, 44vmin) + 26px));
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent calc(var(--globe-r, 44vmin) - 2px), black calc(var(--globe-r, 44vmin) + 26px));
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}

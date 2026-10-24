@@ -1,0 +1,9 @@
+node_modules
+dist
+.env.local
+.env*.local
+probe/
+.DS_Store
+
+# GeoNames 原始数据（CN.txt 有 130MB，只在构建期用，本地下载即可）
+scripts/data/.cache/

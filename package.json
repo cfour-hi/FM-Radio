@@ -1,0 +1,42 @@
+{
+  "name": "fm-radio",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "map:data": "node scripts/build-map-data.mjs",
+    "map:stations": "node scripts/build-stations.mjs",
+    "data:release": "node scripts/build-stations.mjs && pnpm build",
+    "map:places": "node scripts/build-cn-places.mjs",
+    "cn:enrich": "node scripts/build-cn-enrichment.mjs",
+    "map:land": "node scripts/build-land-shape.mjs",
+    "map:dots": "node scripts/build-land-dots.mjs",
+    "map:dots:globe": "node scripts/build-land-dots.mjs --sphere",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "dexie": "^4.4.6",
+    "hls.js": "^1.7.3",
+    "maplibre-gl": "^6.15.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/geojson": "^7946.0.16",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>og</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #08090c;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      OG 分享图源文件（1200×630）。
+      改完之后重新截图即可：
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+          --headless --hide-scrollbars --force-device-scale-factor=1 \
+          --window-size=1200,630 \
+          --screenshot=public/og.png scripts/og.html
+      用 SVG 而不截整站，是因为分享图要能被平台稳定抓取，
+      不能依赖运行时字体加载和 WebGL。
+    -->
+    <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#f0a63c" stop-opacity="0.22" />
+          <stop offset="60%" stop-color="#f0a63c" stop-opacity="0.05" />
+          <stop offset="100%" stop-color="#f0a63c" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#08090c" stop-opacity="0" />
+          <stop offset="100%" stop-color="#08090c" stop-opacity="1" />
+        </linearGradient>
+        <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+          <path d="M80 0H0V80" fill="none" stroke="#ffffff" stroke-opacity="0.035" stroke-width="1" />
+        </pattern>
+      </defs>
+
+      <rect width="1200" height="630" fill="#08090c" />
+      <rect width="1200" height="630" fill="url(#grid)" />
+
+      <!-- 右侧的信号源：同心波 + 一个亮点 -->
+      <g>
+        <circle cx="958" cy="316" r="300" fill="url(#glow)" />
+        <circle cx="958" cy="316" r="228" fill="none" stroke="#f0a63c" stroke-opacity="0.07" stroke-width="1" />
+        <circle cx="958" cy="316" r="164" fill="none" stroke="#f0a63c" stroke-opacity="0.12" stroke-width="1" />
+        <circle cx="958" cy="316" r="104" fill="none" stroke="#f0a63c" stroke-opacity="0.2" stroke-width="1" />
+        <circle cx="958" cy="316" r="52" fill="none" stroke="#f0a63c" stroke-opacity="0.34" stroke-width="1" />
+        <circle cx="958" cy="316" r="6" fill="#f0a63c" />
+        <circle cx="958" cy="316" r="13" fill="none" stroke="#f0a63c" stroke-opacity="0.45" stroke-width="1" />
+      </g>
+
+      <!-- 顶部标识 -->
+      <g font-family="ui-monospace, 'SF Mono', Menlo, monospace">
+        <circle cx="82" cy="96" r="3.5" fill="#f0a63c" />
+        <text x="100" y="101" fill="#e7e9ee" font-size="15" letter-spacing="3.4">FM RADIO</text>
+        <text
+          x="1120"
+          y="101"
+          fill="#565d68"
+          font-size="13"
+          letter-spacing="2.6"
+          text-anchor="end"
+        >
+          45.0 — 108.0 MHz
+        </text>
+      </g>
+      <line x1="82" y1="140" x2="1120" y2="140" stroke="#1e222b" stroke-width="1" />
+
+      <!-- 主标题 -->
+      <g font-family="'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif" fill="#e7e9ee">
+        <text x="80" y="300" font-size="46" font-weight="500" letter-spacing="1">地球上某个地方，</text>
+        <text x="80" y="368" font-size="46" font-weight="500" letter-spacing="1">此刻正在说话</text>
+      </g>
+
+      <text
+        x="82"
+        y="424"
+        font-family="'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif"
+        font-size="19"
+        fill="#8b929d"
+        letter-spacing="0.4"
+      >
+        170 个国家与地区的 1,700 个电台，24 小时不间断
+      </text>
+
+      <line x1="82" y1="512" x2="1120" y2="512" stroke="#1e222b" stroke-width="1" />
+
+      <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" letter-spacing="2">
+        <text x="82" y="552" fill="#565d68">HTTPS 流 · 无需登录 · 不存储音频</text>
+        <text x="1120" y="552" fill="#f0a63c" text-anchor="end" letter-spacing="2.4">点一个坐标，听那里的声音</text>
+      </g>
+    </svg>
+  </body>
+</html>
