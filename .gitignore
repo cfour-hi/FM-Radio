@@ -11,6 +11,7 @@ scripts/data/.cache/
 # 本地工具与 WorkBuddy 发布产物
 .codex/
 artifacts/
+.workbuddy/
 .wbapp_*.genie
 
 # Claude Code 本地设置与预览配置
