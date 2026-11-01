@@ -12,3 +12,8 @@ scripts/data/.cache/
 .codex/
 artifacts/
 .wbapp_*.genie
+
+# Claude Code 本地设置与预览配置
+.claude/settings.local.json
+.claude/.cc-writes/
+.claude/launch.json

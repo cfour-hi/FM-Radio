@@ -11,6 +11,7 @@
     "map:data": "node scripts/build-map-data.mjs",
     "map:stations": "node scripts/build-stations.mjs",
     "data:release": "node scripts/build-stations.mjs && pnpm build",
+    "data:check": "node scripts/check-streams.mjs",
     "map:places": "node scripts/build-cn-places.mjs",
     "cn:enrich": "node scripts/build-cn-enrichment.mjs",
     "map:land": "node scripts/build-land-shape.mjs",

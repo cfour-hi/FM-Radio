@@ -46,6 +46,9 @@ type Props = {
   searchFocusToken?: number;
 };
 
+/** 少于此字数不拉全球目录（无坐标台），先只搜地图上已有的电台。 */
+const CATALOG_MIN_QUERY = 2;
+
 const TABS: { key: Tab; label: string }[] = [
   { key: "search", label: "全部" },
   { key: "nearby", label: "附近" },
@@ -94,6 +97,11 @@ function DrawerContent({
   const q = query.trim();
   const filtering = Boolean(language || genre);
   const searching = q.length > 0 || filtering || tab === "search";
+  /*
+   * 一个字的命中面太大：1.45MB 的全球目录换不来几条有用的结果。
+   * 筛选是显式操作，用户已经知道自己在缩小范围，这时才按需加载整份目录。
+   */
+  const catalogEligible = filtering || q.length >= CATALOG_MIN_QUERY;
   useEffect(() => { setVisibleCount(50); }, [q, language, genre, tab]);
   /*
    * 退场这 180ms 里元素还看得见，内容必须留着。
@@ -124,24 +132,24 @@ function DrawerContent({
   ])), [nearest, where]);
   const deferredQuery = useDeferredValue(q);
 
-  /* 聚焦搜索框：切到搜索 tab，并预加载无坐标台目录 */
+  /* 聚焦搜索框：切到搜索 tab。目录不在这里拉，见下面的字数门槛 */
   const onSearchFocus = useCallback(() => {
     setTab("search");
   }, []);
 
   /*
-   * 无坐标台目录的懒加载挂在「搜索词非空」上，而不是 focus 事件上。
+   * 无坐标台目录的懒加载挂在「搜索词够长或开始筛选」上，而不是 focus 事件上。
    * 原因：headless / 合成环境下 element.focus() 不一定触发 React 的 onFocus，
    * 但键入一定会触发 onChange，这条路更可靠。loadMapCatalog 内部有 pending
    * 缓存，重复触发无害。
    */
   useEffect(() => {
-    if (!searching || catalog !== null) return;
+    if (!live || !catalogEligible || catalog !== null) return;
     let alive = true;
     setCatalogError(false);
     loadMapCatalog().then((data) => { if (alive) setCatalog(data); }).catch(() => { if (alive) setCatalogError(true); });
     return () => { alive = false; };
-  }, [searching, catalog, catalogRetry]);
+  }, [live, catalogEligible, catalog, catalogRetry]);
 
   const allStations = useMemo(() => [...new Map([...stations, ...(catalog ?? [])].map((s) => [s.id, s])).values()], [stations, catalog]);
   const languages = useMemo(() => languageOptions(allStations), [allStations]);
@@ -431,9 +439,16 @@ function DrawerContent({
 
       {searching && (
         <div role="status" className="border-b border-line px-4 py-2 text-[12px] text-dim">
-          {catalog === null ? catalogError ? "完整目录加载失败，当前结果仅含已加载电台。" : "正在补全目录… " : ""}
-          {catalogError && <button type="button" onClick={() => setCatalogRetry((n) => n + 1)} className="ml-2 text-signal">重试</button>}
-          全部电台 · {results.total} 个结果 · 已显示 {items.length} 个
+          {catalog === null && !catalogError && (catalogEligible
+            ? "正在补全目录… "
+            : `输入至少 ${CATALOG_MIN_QUERY} 个字可搜索全球目录，当前只列出地图上的电台。 `)}
+          {catalogError && (
+            <>
+              完整目录加载失败，当前结果仅含已加载电台。
+              <button type="button" onClick={() => setCatalogRetry((n) => n + 1)} className="ml-2 text-signal">重试</button>
+            </>
+          )}
+          {catalog === null && !catalogEligible ? "地图电台" : "全部电台"} · {results.total} 个结果 · 已显示 {items.length} 个
         </div>
       )}
 

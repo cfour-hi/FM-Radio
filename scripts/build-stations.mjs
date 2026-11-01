@@ -16,9 +16,12 @@
  *
  * 用法（周更流程，三步固定）：
  *   1. pnpm data:release        拉全量 + 重新构建（hash 文件名自动换新）
- *   2. 看脚本打印的汇总数字是否正常（台数 / 各片体积 / 中国推断点数）
- *   3. WorkBuddy 发布 dist
- * 数据每天才新一次对收音机完全够——死流是周级别的事，不需要更勤。
+ *   2. pnpm data:check          抽查热门流是否还能连上
+ *   3. 看脚本打印的汇总数字是否正常（台数 / 各片体积 / 中国推断点数），再发布 dist
+ *
+ * 构建失败或快照校验不过时不会写入任何文件；确认数据确实变少时用
+ * `--force` 跳过缩水检查。数据每天才新一次对收音机完全够——死流是周级别
+ * 的事，不需要更勤。
  */
 
 import { writeFile, mkdir, readFile } from "node:fs/promises";
@@ -27,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { inferChinaGeo } from "./cn-geo.mjs";
 import { CAPITALS } from "./cn-admin.mjs";
 import { get, pick, dropOutliers } from "./lib/radio.mjs";
+import { checkShrink, validateSnapshot } from "./lib/snapshot.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(HERE, "../src/data");
@@ -38,8 +42,30 @@ const CHINA_REGION = new Set(["CN", "HK", "MO", "TW"]);
 const PAGE = 1000;
 const MAX_PAGES = 100;
 
-/** core 里境外台的条数上限（中国台全部进 core，不占这个额度）。 */
-const CORE_FOREIGN = 3000;
+/**
+ * core 里境外台的条数上限（中国台全部进 core，不占这个额度）。
+ *
+ * core 是首屏阻塞下载的那一片，rest 会在地图就绪后补上——两者最终都画在
+ * 地图上，所以这里只决定「第一帧先看到多少颗光点」。1000 条足够填满默认
+ * 视角里境外最亮的那一圈，同时把首屏数据从约 400KB gzip 压到 200KB 左右。
+ */
+const CORE_FOREIGN = 1000;
+
+/** 全量拉取的下限。低于这个数说明接口或分页出了问题，不能当成正常快照。 */
+const MIN_TOTAL = 10_000;
+
+/** 维护者确认数据确实变少时用 --force 跳过「不能缩水」的检查。 */
+const FORCE = process.argv.includes("--force");
+
+/** 三份分片的文件名，读写共用，避免字符串抄两遍。 */
+const SHARDS = {
+  core: "stations-core.json",
+  rest: "stations-rest.json",
+  catalog: "stations-catalog.json",
+};
+
+const round3 = (value) =>
+  typeof value === "number" && Number.isFinite(value) ? Math.round(value * 1e3) / 1e3 : value;
 
 /* 前 18 列保持兼容，追加语言与类型原始元数据。 */
 const FIELDS = [
@@ -55,8 +81,9 @@ const toRow = (s) => [
   s.countryName,
   s.codec,
   s.bitrate,
-  s.lat,
-  s.lon,
+  // 3 位小数≈100 米，对电台定位足够；4 位只是白占体积（一万多个点合起来不可忽略）
+  round3(s.lat),
+  round3(s.lon),
   s.clicks,
   s.hls ? 1 : 0,
   s.sslError ? 1 : 0,
@@ -86,10 +113,14 @@ async function collectAll() {
         reverse: "true",
       });
     } catch (err) {
-      console.warn(`  第 ${page + 1} 页失败：${err.message}，停止翻页`);
-      break;
+      /*
+       * 不能 break：翻到一半停下，产物仍然「有效」，只是少了后半截。
+       * 这种残缺快照发出去比构建失败难查得多——构建失败立刻看得见。
+       */
+      throw new Error(`第 ${page + 1} 页拉取失败：${err.message}`);
     }
-    if (!Array.isArray(rows) || rows.length === 0) break;
+    if (!Array.isArray(rows)) throw new Error(`第 ${page + 1} 页返回的不是数组`);
+    if (rows.length === 0) break;
     for (const raw of rows) {
       const s = pick(raw, { allowNoGeo: true });
       if (!s) continue;
@@ -121,6 +152,20 @@ function fromLocal(list) {
   return out;
 }
 
+/** 读上一版的三片数量；文件不存在（首次生成）时返回 0，不触发缩水检查。 */
+async function readPreviousCounts() {
+  const counts = {};
+  for (const [key, file] of Object.entries(SHARDS)) {
+    counts[key] = await readFile(resolve(OUT_DIR, file), "utf8")
+      .then((raw) => {
+        const snapshot = JSON.parse(raw);
+        return Array.isArray(snapshot.stations) ? snapshot.stations.length : 0;
+      })
+      .catch(() => 0);
+  }
+  return counts;
+}
+
 async function main() {
   const t0 = Date.now();
 
@@ -135,6 +180,11 @@ async function main() {
     console.log("拉取 radio-browser 全量…");
     all = await collectAll();
   }
+  // 本地 --input 常用于调试小样本，不对它设全量下限；在线拉取则必须够量
+  if (!inputArg && all.length < MIN_TOTAL) {
+    throw new Error(`只拉到 ${all.length} 台，低于下限 ${MIN_TOTAL}，拒绝生成快照`);
+  }
+
   const chinaRaw = all.filter((s) => CHINA_REGION.has(s.countryCode));
   const foreignRaw = all.filter((s) => !CHINA_REGION.has(s.countryCode));
   console.log(`合计 ${all.length} 台（中国 ${chinaRaw.length} + 境外 ${foreignRaw.length}）`);
@@ -191,6 +241,22 @@ async function main() {
   const generatedAt = new Date().toISOString().slice(0, 10);
   const base = { v: 1, generatedAt, source: "radio-browser.info" };
 
+  /*
+   * 写盘前的最后一道闸：任何一条不过，三份文件一个都不写。
+   * 半份新数据混着半份旧数据，比完全没有新数据更难排查。
+   */
+  const previous = await readPreviousCounts();
+  const counts = { core: core.length, rest: rest.length, catalog: catalog.length };
+  const validation = validateSnapshot({ core, rest, catalog });
+  const shrink = FORCE ? { ok: true, errors: [] } : checkShrink(previous, counts);
+  const errors = [...validation.errors, ...shrink.errors];
+  if (errors.length > 0) {
+    console.error("快照校验失败，未写入任何文件：");
+    for (const error of errors.slice(0, 20)) console.error(`  - ${error}`);
+    if (errors.length > 20) console.error(`  …另有 ${errors.length - 20} 条`);
+    process.exit(1);
+  }
+
   await mkdir(OUT_DIR, { recursive: true });
 
   const coreBody = JSON.stringify({
@@ -210,14 +276,17 @@ async function main() {
     stations: catalog.map((s) => [s.id, s.name, s.countryCode, s.clicks, s.url, s.languages || "", s.tags || ""]),
   });
 
-  await writeFile(resolve(OUT_DIR, "stations-core.json"), coreBody);
-  await writeFile(resolve(OUT_DIR, "stations-rest.json"), restBody);
-  await writeFile(resolve(OUT_DIR, "stations-catalog.json"), catalogBody);
+  await writeFile(resolve(OUT_DIR, SHARDS.core), coreBody);
+  await writeFile(resolve(OUT_DIR, SHARDS.rest), restBody);
+  await writeFile(resolve(OUT_DIR, SHARDS.catalog), catalogBody);
 
   const kb = (b) => `${(b.length / 1024).toFixed(0)} KB`;
   console.log("");
-  console.log("拉取 62,790 · 可用（https 可播）" + `${all.length}`.padStart(8));
+  console.log(`拉取全量 · 可用（https 可播） ${all.length}`);
   console.log(`可上图 ${core.length + rest.length}（中国 ${chinaPlaced.length} + 境外 ${foreignKeep.length}）`);
+  if (previous.core || previous.rest || previous.catalog) {
+    console.log(`上一版 core ${previous.core} · rest ${previous.rest} · catalog ${previous.catalog}`);
+  }
   console.log(
     `core ${String(core.length).padStart(6)} 台  ${kb(coreBody).padStart(8)}` +
       ` · rest ${String(rest.length).padStart(6)} 台  ${kb(restBody).padStart(8)}` +
