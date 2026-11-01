@@ -1,0 +1,99 @@
+# 地球之声 · FM Radio
+
+一个纯前端的全球电台地图：转动地球，点一个光点，听那个地方此刻正在说的话。
+
+- 9,000+ 个电台落在球面上；中国台按台名推断到城市，并标注估算
+- 搜索台名、省份、城市或国家，按语言与类型筛选
+- 收藏、最近收听、附近电台、随机探索、返回上一站
+- 睡眠定时、分享深链、Media Session 锁屏控制
+- 星际 / 银河 / 隧道三种粒子特效壁纸
+
+没有账号、没有后端；收藏与收听记录只保存在本机。
+
+## 技术栈
+
+React 19 · Vite · TypeScript · Zustand · MapLibre GL · hls.js · Tailwind CSS 4 · Dexie
+
+## 快速开始
+
+```bash
+pnpm install
+pnpm dev
+```
+
+打开 http://localhost:5555 。
+
+要求 Node.js >= 22.6（测试依赖 `--experimental-strip-types`）与 pnpm 12，见 `.nvmrc` / `package.json`。
+
+## 常用命令
+
+| 命令 | 作用 |
+| --- | --- |
+| `pnpm dev` | 本地开发服务器 |
+| `pnpm build` | 类型检查 + 生产构建 |
+| `pnpm preview` | 预览构建产物 |
+| `pnpm typecheck` | 只跑 TypeScript |
+| `pnpm test` | Node 测试（纯逻辑，不联网） |
+| `pnpm data:release` | 拉取 radio-browser 全量并重建快照，然后构建 |
+| `pnpm data:validate` | 校验仓库里已提交的三份快照，不联网 |
+| `pnpm data:check` | 抽查热门流是否还能连上，需要外网 |
+
+`scripts/` 下另有地图底图、中国地名等构建脚本，只在数据更新时手动使用。
+
+## 数据
+
+电台目录来自 [radio-browser](https://www.radio-browser.info/)，在构建期生成三份快照，前端用 `?url` 引入并配合内容哈希缓存：
+
+| 分片 | 内容 | 加载时机 |
+| --- | --- | --- |
+| `core` | 中国全部 + 境外点击量前 1000 | 首屏，地图就绪前 |
+| `rest` | 其余有坐标的境外台 | 地图就绪后空闲加载 |
+| `catalog` | 无坐标、可播但无法上图 | 搜索词达到 2 个字或开始筛选时 |
+
+周更流程：
+
+```bash
+pnpm data:release     # 拉全量 + 校验 + 构建；失败不会写入任何文件
+pnpm data:check       # 抽查热门流
+pnpm data:validate    # 复查快照结构
+```
+
+构建脚本会在写盘前检查分片结构、跨片重复和数量骤降（低于上一版 85% 直接失败）；确认数据确实变少时用 `node scripts/build-stations.mjs --force`。
+
+## 目录
+
+```
+src/
+  components/   页面外壳、抽屉、播放条、引导等
+  pages/        路由页面
+  map/          MapLibre 地球、命中测试、底图
+  fx/           粒子特效场景与注册表
+  player/       播放引擎、错误分类、Media Session
+  store/        zustand：播放、地图、特效、收藏
+  lib/          纯逻辑（搜索、发现、存储、定位、手势…）
+  data/         构建期生成的电台快照
+scripts/        数据管线与地图底图生成
+tests/          Node 测试
+```
+
+更细的模块关系与数据流见 [docs/architecture.md](docs/architecture.md)。
+
+## 测试与 CI
+
+`pnpm test` 覆盖 109 个纯逻辑用例；`.github/workflows/ci.yml` 在 push / PR 时依次跑 `typecheck`、`data:validate`、`test` 与 `build`。`data:check` 不在 CI 里运行——它会访问真实流地址，适合周更时手动执行。
+
+## 部署
+
+静态站点，构建产物在 `dist/`。分享卡片需要绝对地址时，在 `.env.local` 里设置：
+
+```bash
+VITE_SITE_URL=https://your-domain.example
+```
+
+留空也能正常运行，只是 `og:url` / `og:image` 会退化为相对路径。示例见 `.env.example`。
+
+## 说明
+
+- 流地址由第三方提供，只收 https；部分台随时可能停播。
+- 定位使用浏览器 Geolocation，坐标只在内存中参与距离计算，不上传、不持久化。
+- 移动端真机（软键盘、锁屏、后台播放）尚未完成全面验收。
