@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: ".node-version"
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -44,14 +44,10 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: ".node-version"
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      # @playwright/test 尚未写入 lockfile（创建时的环境无法访问 npm）。
-      # 先在这里临时安装；本地执行过 pnpm add -D 后应改为普通 devDependency。
-      - run: pnpm add -D @playwright/test@^1
 
       - run: pnpm exec playwright install --with-deps chromium
 

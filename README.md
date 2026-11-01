@@ -23,7 +23,7 @@ pnpm dev
 
 打开 http://localhost:5555 。
 
-要求 Node.js >= 22.6（测试依赖 `--experimental-strip-types`）与 pnpm 12，见 `.nvmrc` / `package.json`。
+要求 Node.js >= 22.6（测试依赖 `--experimental-strip-types`）与 pnpm 12；当前固定在 24，见 `.node-version` / `package.json`。
 
 ## 常用命令
 
