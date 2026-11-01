@@ -20,7 +20,8 @@
     "map:land": "node scripts/build-land-shape.mjs",
     "map:dots": "node scripts/build-land-dots.mjs",
     "map:dots:globe": "node scripts/build-land-dots.mjs --sphere",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "clsx": "^2.1.1",

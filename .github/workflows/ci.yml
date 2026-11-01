@@ -33,3 +33,26 @@ jobs:
       - run: pnpm test
 
       - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # @playwright/test 尚未写入 lockfile（创建时的环境无法访问 npm）。
+      # 先在这里临时安装；本地执行过 pnpm add -D 后应改为普通 devDependency。
+      - run: pnpm add -D @playwright/test@^1
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm e2e

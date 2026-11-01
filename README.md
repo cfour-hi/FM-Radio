@@ -34,6 +34,7 @@ pnpm dev
 | `pnpm preview` | 预览构建产物 |
 | `pnpm typecheck` | 只跑 TypeScript |
 | `pnpm test` | Node 测试（纯逻辑，不联网） |
+| `pnpm e2e` | Playwright 冒烟（需先安装 `@playwright/test`，见下） |
 | `pnpm data:release` | 拉取 radio-browser 全量并重建快照，然后构建 |
 | `pnpm data:validate` | 校验仓库里已提交的三份快照，不联网 |
 | `pnpm data:check` | 抽查热门流是否还能连上，需要外网 |
@@ -80,7 +81,14 @@ tests/          Node 测试
 
 ## 测试与 CI
 
-`pnpm test` 覆盖 109 个纯逻辑用例；`.github/workflows/ci.yml` 在 push / PR 时依次跑 `typecheck`、`data:validate`、`test` 与 `build`。`data:check` 不在 CI 里运行——它会访问真实流地址，适合周更时手动执行。
+`pnpm test` 覆盖 107 个纯逻辑用例；`pnpm e2e` 是 Playwright 冒烟，覆盖首屏、搜索、点台、深链和抽屉五条路径。本地首次运行前需要安装依赖与 Chromium：
+
+```bash
+pnpm add -D @playwright/test
+pnpm exec playwright install chromium
+```
+
+`.github/workflows/ci.yml` 在 push / PR 时依次跑 `typecheck`、`data:validate`、`test`、`build`，之后单独跑 e2e。`data:check` 不在 CI 里运行——它会访问真实流地址，适合周更时手动执行。
 
 ## 部署
 

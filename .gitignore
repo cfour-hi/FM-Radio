@@ -17,3 +17,9 @@ artifacts/
 .claude/settings.local.json
 .claude/.cc-writes/
 .claude/launch.json
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
