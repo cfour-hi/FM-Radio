@@ -1,0 +1,529 @@
+$ node --experimental-strip-types --test tests/*.test.mjs
+TAP version 13
+# Subtest: 从查询串里认出电台 id
+ok 1 - 从查询串里认出电台 id
+  ---
+  duration_ms: 4.167875
+  type: 'test'
+  ...
+# Subtest: 可疑的 id 一律当作没有
+ok 2 - 可疑的 id 一律当作没有
+  ---
+  duration_ms: 0.506833
+  type: 'test'
+  ...
+# Subtest: 分享链接保留发布平台的参数，只摘掉调试用的 guide
+ok 3 - 分享链接保留发布平台的参数，只摘掉调试用的 guide
+  ---
+  duration_ms: 0.32825
+  type: 'test'
+  ...
+# Subtest: 已有同一个参数时是替换，不是追加
+ok 4 - 已有同一个参数时是替换，不是追加
+  ---
+  duration_ms: 0.486
+  type: 'test'
+  ...
+# Subtest: 生成的链接能被自己读回来
+ok 5 - 生成的链接能被自己读回来
+  ---
+  duration_ms: 0.262833
+  type: 'test'
+  ...
+# Subtest: 隐藏期间零测量，恢复可见与窗口变化后重新校准
+ok 6 - 隐藏期间零测量，恢复可见与窗口变化后重新校准
+  ---
+  duration_ms: 5.820583
+  type: 'test'
+  ...
+# Subtest: 尺寸失效期间不计算，异常投影结果不会阻止下一次重试
+ok 7 - 尺寸失效期间不计算，异常投影结果不会阻止下一次重试
+  ---
+  duration_ms: 0.386084
+  type: 'test'
+  ...
+# Subtest: 球面距离支持赤道、日界线、重合点和对跖点
+ok 8 - 球面距离支持赤道、日界线、重合点和对跖点
+  ---
+  duration_ms: 3.389375
+  type: 'test'
+  ...
+# Subtest: 全球电台按距离排序，剔除无效坐标，同距离按热度排序且不改变原目录
+ok 9 - 全球电台按距离排序，剔除无效坐标，同距离按热度排序且不改变原目录
+  ---
+  duration_ms: 0.546
+  type: 'test'
+  ...
+# Subtest: 默认仅最近50台，分批目录到达后新近台进入结果
+ok 10 - 默认仅最近50台，分批目录到达后新近台进入结果
+  ---
+  duration_ms: 0.2725
+  type: 'test'
+  ...
+# Subtest: 估算电台及低精度位置不展示伪精确距离，省级位置明确标注
+ok 11 - 估算电台及低精度位置不展示伪精确距离，省级位置明确标注
+  ---
+  duration_ms: 0.193125
+  type: 'test'
+  ...
+# Subtest: 无标记：首次进入显示引导
+ok 12 - 无标记：首次进入显示引导
+  ---
+  duration_ms: 2.111708
+  type: 'test'
+  ...
+# Subtest: 写入标记：键名/值正确，之后不再显示
+ok 13 - 写入标记：键名/值正确，之后不再显示
+  ---
+  duration_ms: 0.679916
+  type: 'test'
+  ...
+# Subtest: ?guide=1 强制重看；?guide=0 / 裸 ?guide / 其它参数不强制
+ok 14 - ?guide=1 强制重看；?guide=0 / 裸 ?guide / 其它参数不强制
+  ---
+  duration_ms: 0.287375
+  type: 'test'
+  ...
+# Subtest: ?guide=1 被识别为强制（与标记无关）
+ok 15 - ?guide=1 被识别为强制（与标记无关）
+  ---
+  duration_ms: 0.305042
+  type: 'test'
+  ...
+# Subtest: 损坏值视为未看过
+ok 16 - 损坏值视为未看过
+  ---
+  duration_ms: 0.514375
+  type: 'test'
+  ...
+# Subtest: 存储被禁用：读为未看过、写不抛、引导仍显示
+ok 17 - 存储被禁用：读为未看过、写不抛、引导仍显示
+  ---
+  duration_ms: 0.342959
+  type: 'test'
+  ...
+# Subtest: 调谐只在 4 秒阈值提醒；8 秒超时清理全部计时器
+ok 18 - 调谐只在 4 秒阈值提醒；8 秒超时清理全部计时器
+  ---
+  duration_ms: 3.003208
+  type: 'test'
+  ...
+# Subtest: 正常播放期间无周期更新；暂停和停止清理全部计时器
+ok 19 - 正常播放期间无周期更新；暂停和停止清理全部计时器
+  ---
+  duration_ms: 0.663625
+  type: 'test'
+  ...
+# Subtest: 缓冲期间排两个里程碑：8 秒提示可以换台，15 秒判失败
+ok 20 - 缓冲期间排两个里程碑：8 秒提示可以换台，15 秒判失败
+  ---
+  duration_ms: 0.56175
+  type: 'test'
+  ...
+# Subtest: stalled 与 waiting 同样算卡住
+ok 21 - stalled 与 waiting 同样算卡住
+  ---
+  duration_ms: 1.249709
+  type: 'test'
+  ...
+# Subtest: 暂停后恢复重新计时；换台后重新计时且忽略旧音频事件
+ok 22 - 暂停后恢复重新计时；换台后重新计时且忽略旧音频事件
+  ---
+  duration_ms: 0.588375
+  type: 'test'
+  ...
+# Subtest: waiting 反复触发不会把连接超时往后推
+ok 23 - waiting 反复触发不会把连接超时往后推
+  ---
+  duration_ms: 0.224333
+  type: 'test'
+  ...
+# Subtest: 有缓冲但一直不出声，8 秒照样判失败
+ok 24 - 有缓冲但一直不出声，8 秒照样判失败
+  ---
+  duration_ms: 0.243042
+  type: 'test'
+  ...
+# Subtest: 播放被浏览器拒绝也会清理阈值提醒和连接超时
+ok 25 - 播放被浏览器拒绝也会清理阈值提醒和连接超时
+  ---
+  duration_ms: 0.360375
+  type: 'test'
+  ...
+# Subtest: MediaError.code 一对一映射到分类与文案
+ok 26 - MediaError.code 一对一映射到分类与文案
+  ---
+  duration_ms: 0.83925
+  type: 'test'
+  ...
+# Subtest: 没有 code 或 code 不认识时兜底为 unknown
+ok 27 - 没有 code 或 code 不认识时兜底为 unknown
+  ---
+  duration_ms: 0.085333
+  type: 'test'
+  ...
+# Subtest: 每种分类都有可读文案，不会漏出空串
+ok 28 - 每种分类都有可读文案，不会漏出空串
+  ---
+  duration_ms: 0.15525
+  type: 'test'
+  ...
+# Subtest: 已到期会话不自动恢复，用户点击播放重新连接
+ok 29 - 已到期会话不自动恢复，用户点击播放重新连接
+  ---
+  duration_ms: 1.427917
+  type: 'test'
+  ...
+# Subtest: 上一站恢复真实访问顺序及原队列，不在两个台间反复跳
+ok 30 - 上一站恢复真实访问顺序及原队列，不在两个台间反复跳
+  ---
+  duration_ms: 0.328709
+  type: 'test'
+  ...
+# Subtest: 定时跨换台保留，到期释放连接；重设后也可恢复播放
+ok 31 - 定时跨换台保留，到期释放连接；重设后也可恢复播放
+  ---
+  duration_ms: 0.41175
+  type: 'test'
+  ...
+# Subtest: 从关闭打开：先进入 enter，等一帧再进 open
+ok 32 - 从关闭打开：先进入 enter，等一帧再进 open
+  ---
+  duration_ms: 0.513042
+  type: 'test'
+  ...
+# Subtest: 从打开关闭：先进入 closing，不是直接 closed
+ok 33 - 从打开关闭：先进入 closing，不是直接 closed
+  ---
+  duration_ms: 0.071792
+  type: 'test'
+  ...
+# Subtest: 入场途中就关掉也要能收
+ok 34 - 入场途中就关掉也要能收
+  ---
+  duration_ms: 0.056583
+  type: 'test'
+  ...
+# Subtest: 关闭途中重新打开：回到 open，不重走入场
+ok 35 - 关闭途中重新打开：回到 open，不重走入场
+  ---
+  duration_ms: 0.055
+  type: 'test'
+  ...
+# Subtest: 只有 closed 不占 DOM
+ok 36 - 只有 closed 不占 DOM
+  ---
+  duration_ms: 0.135417
+  type: 'test'
+  ...
+# Subtest: 绝对截止时间到期只执行一次，恢复前台立即检查
+ok 37 - 绝对截止时间到期只执行一次，恢复前台立即检查
+  ---
+  duration_ms: 1.768
+  type: 'test'
+  ...
+# Subtest: 重新设置和取消清理旧任务，不受暂停或换台影响
+ok 38 - 重新设置和取消清理旧任务，不受暂停或换台影响
+  ---
+  duration_ms: 0.098875
+  type: 'test'
+  ...
+# Subtest: 过期截止时间立即停止，非法和空截止时间不启动
+ok 39 - 过期截止时间立即停止，非法和空截止时间不启动
+  ---
+  duration_ms: 0.067458
+  type: 'test'
+  ...
+# Subtest: 中国台按同城 → 同省 → 同国排序
+ok 40 - 中国台按同城 → 同省 → 同国排序
+  ---
+  duration_ms: 1.522167
+  type: 'test'
+  ...
+# Subtest: 同一档内按距离，再按热度
+ok 41 - 同一档内按距离，再按热度
+  ---
+  duration_ms: 0.415459
+  type: 'test'
+  ...
+# Subtest: 境外台只在本国内找，按 300 / 1500 公里分档
+ok 42 - 境外台只在本国内找，按 300 / 1500 公里分档
+  ---
+  duration_ms: 0.210167
+  type: 'test'
+  ...
+# Subtest: 候选比 limit 多时只取前几个
+ok 43 - 候选比 limit 多时只取前几个
+  ---
+  duration_ms: 0.146208
+  type: 'test'
+  ...
+# Subtest: accept 用来剔除同样播不了的台
+ok 44 - accept 用来剔除同样播不了的台
+  ---
+  duration_ms: 0.205291
+  type: 'test'
+  ...
+# Subtest: 没有坐标也不会算出 NaN，仍按热度排
+ok 45 - 没有坐标也不会算出 NaN，仍按热度排
+  ---
+  duration_ms: 0.074875
+  type: 'test'
+  ...
+# Subtest: 自己在候选里也不会被选成替代
+ok 46 - 自己在候选里也不会被选成替代
+  ---
+  duration_ms: 0.129291
+  type: 'test'
+  ...
+# Subtest: 没有任何同省同国的台时，hasAlternative 说没有
+ok 47 - 没有任何同省同国的台时，hasAlternative 说没有
+  ---
+  duration_ms: 0.058459
+  type: 'test'
+  ...
+# Subtest: 不改变传入的候选顺序
+ok 48 - 不改变传入的候选顺序
+  ---
+  duration_ms: 0.417875
+  type: 'test'
+  ...
+# Subtest: 语言别名和类型精确归类，缺失元数据不会按国别猜测
+ok 49 - 语言别名和类型精确归类，缺失元数据不会按国别猜测
+  ---
+  duration_ms: 12.240667
+  type: 'test'
+  ...
+# Subtest: 随机范围限制严格，当前地区按省优先，否则按国家
+ok 50 - 随机范围限制严格，当前地区按省优先，否则按国家
+  ---
+  duration_ms: 0.172958
+  type: 'test'
+  ...
+# Subtest: 随机避开当前和近期电台，耗尽可循环，单台不触发暂停
+ok 51 - 随机避开当前和近期电台，耗尽可循环，单台不触发暂停
+  ---
+  duration_ms: 0.1755
+  type: 'test'
+  ...
+# Subtest: 先筛选再限制搜索数量，低热度匹配台不会被前 50 条挤掉
+ok 52 - 先筛选再限制搜索数量，低热度匹配台不会被前 50 条挤掉
+  ---
+  duration_ms: 19.45975
+  type: 'test'
+  ...
+# Subtest: 所有现有目录分片携带真实元数据且列位置一致
+ok 53 - 所有现有目录分片携带真实元数据且列位置一致
+  ---
+  duration_ms: 41.052041
+  type: 'test'
+  ...
+# Subtest: 语言选项只展示规范类别，清除众包数字、标签和重复方言写法
+ok 54 - 语言选项只展示规范类别，清除众包数字、标签和重复方言写法
+  ---
+  duration_ms: 0.192375
+  type: 'test'
+  ...
+# Subtest: 全部分片：搜索结果、排序和截断与原实现一致
+ok 55 - 全部分片：搜索结果、排序和截断与原实现一致
+  ---
+  duration_ms: 61.423167
+  type: 'test'
+  ...
+# Subtest: 同热度保持原顺序；新快照不会复用旧索引
+ok 56 - 同热度保持原顺序；新快照不会复用旧索引
+  ---
+  duration_ms: 0.099459
+  type: 'test'
+  ...
+# Subtest: 台名前缀优先于台名包含，哪怕包含的那个更热门
+ok 57 - 台名前缀优先于台名包含，哪怕包含的那个更热门
+  ---
+  duration_ms: 0.4255
+  type: 'test'
+  ...
+# Subtest: 台名命中优先于地区命中
+ok 58 - 台名命中优先于地区命中
+  ---
+  duration_ms: 0.18575
+  type: 'test'
+  ...
+# Subtest: 按省份、城市、国家都能搜到，包括省市连写
+ok 59 - 按省份、城市、国家都能搜到，包括省市连写
+  ---
+  duration_ms: 12.113542
+  type: 'test'
+  ...
+# Subtest: 港澳台用规范全称，不依赖运行时的语言包写法
+ok 60 - 港澳台用规范全称，不依赖运行时的语言包写法
+  ---
+  duration_ms: 0.198167
+  type: 'test'
+  ...
+# Subtest: 地区命中另设上限，但回传真实总数
+ok 61 - 地区命中另设上限，但回传真实总数
+  ---
+  duration_ms: 0.184125
+  type: 'test'
+  ...
+# Subtest: 单个字不触发地区匹配，只按台名找
+ok 62 - 单个字不触发地区匹配，只按台名找
+  ---
+  duration_ms: 0.080375
+  type: 'test'
+  ...
+# Subtest: 大小写与变音符号不影响匹配
+ok 63 - 大小写与变音符号不影响匹配
+  ---
+  duration_ms: 0.345542
+  type: 'test'
+  ...
+# Subtest: 不改变传入的数组顺序，空关键词不返回结果
+ok 64 - 不改变传入的数组顺序，空关键词不返回结果
+  ---
+  duration_ms: 0.348209
+  type: 'test'
+  ...
+# Subtest: 方向锁：阈值内不判，超过后只认一个轴
+ok 65 - 方向锁：阈值内不判，超过后只认一个轴
+  ---
+  duration_ms: 0.692833
+  type: 'test'
+  ...
+# Subtest: 方向锁：平手判给纵向
+ok 66 - 方向锁：平手判给纵向
+  ---
+  duration_ms: 0.062625
+  type: 'test'
+  ...
+# Subtest: 方向锁：脏数据不抛，一律不判
+ok 67 - 方向锁：脏数据不抛，一律不判
+  ---
+  duration_ms: 0.054416
+  type: 'test'
+  ...
+# Subtest: 速度取尾段：慢慢拖一大段再猛一甩，算甩
+ok 68 - 速度取尾段：慢慢拖一大段再猛一甩，算甩
+  ---
+  duration_ms: 0.099791
+  type: 'test'
+  ...
+# Subtest: 速度：全部落在窗口外时，退回最后一个真实间隔
+ok 69 - 速度：全部落在窗口外时，退回最后一个真实间隔
+  ---
+  duration_ms: 0.138958
+  type: 'test'
+  ...
+# Subtest: 速度：异常输入返回 0，绝不返回 NaN
+ok 70 - 速度：异常输入返回 0，绝不返回 NaN
+  ---
+  duration_ms: 0.120375
+  type: 'test'
+  ...
+# Subtest: 关闭判定：拖过尺寸比例就该关
+ok 71 - 关闭判定：拖过尺寸比例就该关
+  ---
+  duration_ms: 0.145541
+  type: 'test'
+  ...
+# Subtest: 关闭判定：没拖到位但甩得够快，也算
+ok 72 - 关闭判定：没拖到位但甩得够快，也算
+  ---
+  duration_ms: 0.055375
+  type: 'test'
+  ...
+# Subtest: 关闭判定：反方向一律不算
+ok 73 - 关闭判定：反方向一律不算
+  ---
+  duration_ms: 0.2975
+  type: 'test'
+  ...
+# Subtest: 关闭判定：尺寸为 0 时退到最小距离，不产生 NaN
+ok 74 - 关闭判定：尺寸为 0 时退到最小距离，不产生 NaN
+  ---
+  duration_ms: 0.333917
+  type: 'test'
+  ...
+# Subtest: 播放条的阈值比抽屉小，同一行程才够用
+ok 75 - 播放条的阈值比抽屉小，同一行程才够用
+  ---
+  duration_ms: 0.127458
+  type: 'test'
+  ...
+# Subtest: 播放条收起用自己的档位，抽屉关闭不受影响
+ok 76 - 播放条收起用自己的档位，抽屉关闭不受影响
+  ---
+  duration_ms: 0.056459
+  type: 'test'
+  ...
+# Subtest: 展开判定与关闭判定对同一段行程符号相反
+ok 77 - 展开判定与关闭判定对同一段行程符号相反
+  ---
+  duration_ms: 0.09275
+  type: 'test'
+  ...
+# Subtest: 位移夹紧：永远落在 [0, 尺寸] 之间
+ok 78 - 位移夹紧：永远落在 [0, 尺寸] 之间
+  ---
+  duration_ms: 0.060042
+  type: 'test'
+  ...
+# (node:32609) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 浏览器返回原始全球坐标与精度，不推算省份、不写入存储
+ok 79 - 浏览器返回原始全球坐标与精度，不推算省份、不写入存储
+  ---
+  duration_ms: 1.80025
+  type: 'test'
+  ...
+# Subtest: 无效坐标和精度不进入附近计算
+ok 80 - 无效坐标和精度不进入附近计算
+  ---
+  duration_ms: 0.330167
+  type: 'test'
+  ...
+# Subtest: 权限拒绝、不可用、超时和同步异常提供可恢复的提示
+ok 81 - 权限拒绝、不可用、超时和同步异常提供可恢复的提示
+  ---
+  duration_ms: 0.523167
+  type: 'test'
+  ...
+# Subtest: 不安全上下文和不支持定位时不尝试请求
+ok 82 - 不安全上下文和不支持定位时不尝试请求
+  ---
+  duration_ms: 0.21075
+  type: 'test'
+  ...
+# Subtest: 浏览器不回调时总期限兜底；迟到回调无效，之后仍可重试
+ok 83 - 浏览器不回调时总期限兜底；迟到回调无效，之后仍可重试
+  ---
+  duration_ms: 0.839125
+  type: 'test'
+  ...
+# Subtest: 只缓存手选地区，忽略旧 IP 缓存及过期或无效缓存
+ok 84 - 只缓存手选地区，忽略旧 IP 缓存及过期或无效缓存
+  ---
+  duration_ms: 0.630333
+  type: 'test'
+  ...
+# Subtest: 存储被禁用时仍可手动选择地区
+ok 85 - 存储被禁用时仍可手动选择地区
+  ---
+  duration_ms: 0.31825
+  type: 'test'
+  ...
+# Subtest: 手选地区按省会、其他城市构建本地播放队列
+ok 86 - 手选地区按省会、其他城市构建本地播放队列
+  ---
+  duration_ms: 0.17775
+  type: 'test'
+  ...
+1..86
+# tests 86
+# suites 0
+# pass 86
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 380.196709

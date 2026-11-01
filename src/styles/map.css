@@ -1,5 +1,39 @@
 /* 地图控件与画布的深色改造。只覆盖外观，不动交互行为。 */
 
+/*
+ * 特效层（地球层 / 粒子特效层）的交叉淡入淡出。
+ *
+ * 两层都是 absolute inset-0 的兄弟 div，靠 opacity 分谁在上。过渡 700ms：
+ * 快了切换显得突兀，慢了像页面卡了一下。reduced-motion 时把时长归零，
+ * 直接硬切——系统的减少动态偏好优先于任何视觉设计。
+ */
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 700ms ease,
+    visibility 0s linear;
+}
+
+/* 淡出的那一层：透明之后连事件带渲染一起收走 */
+.fx-layer-hidden {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 700ms ease,
+    visibility 0s linear 700ms;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-layer,
+  .fx-layer-hidden {
+    transition: none;
+  }
+}
+
 .map-shell .maplibregl-canvas {
   outline: none;
 }
@@ -18,7 +52,18 @@
   letter-spacing: 0.02em;
   padding: 2px 8px;
   border-radius: 4px;
-  margin: 0 8px 8px 0;
+  /*
+   * 底部要让开播放条。
+   *
+   * 移动端播放条是贴底通栏，正好压在这行版权信息上——而它被盖住就等于
+   * 没有，违反了上面那句「必须看得见」。这个变量在桌面恒为 0，所以
+   * 桌面仍是原来的 8px。
+   *
+   * 注意这条必须写在 CSS 文件里：maplibre-gl.css 和本文件都不在任何
+   * @layer 中，未分层的样式压过 Tailwind 的 utilities 层，给这个元素加
+   * Tailwind 类是不起作用的。
+   */
+  margin: 0 8px calc(var(--player-bar-h, 0px) + 8px) 0;
   backdrop-filter: blur(4px);
   border: 1px solid var(--color-line-soft);
 }
@@ -125,6 +170,61 @@
     animation: none;
     transform: scale(0.8);
     opacity: 0.55;
+  }
+}
+
+/*
+ * 悬停提示条。位置由 hoverTooltip 用 transform 写，这里只管长相。
+ *
+ * 不加 backdrop-filter：它要对底下的 WebGL canvas 做一次离屏取样，
+ * 而这个元素是跟着鼠标每帧移动的，代价比它带来的通透感高得多。
+ */
+.map-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  max-width: 240px;
+  padding: 6px 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  /* 必须穿透：否则提示条压住光标，会触发 mouseleave → 隐藏 → mouseenter 的闪烁 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 90ms linear;
+  will-change: transform;
+}
+
+.map-tip[data-show="1"] {
+  opacity: 1;
+}
+
+.map-tip-name {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.map-tip-meta {
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+}
+
+.map-tip-more {
+  margin-top: 3px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-cold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-tip {
+    transition: none;
   }
 }
 

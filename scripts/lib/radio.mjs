@@ -79,6 +79,8 @@ export function pick(raw, { allowNoGeo = false } = {}) {
     countryCode: text(raw.countrycode).toUpperCase(),
     countryName: text(raw.country),
     state: text(raw.state),
+    languages: text(raw.language),
+    tags: text(raw.tags),
     codec: (text(raw.codec) || "UNKNOWN").toUpperCase(),
     bitrate: num(raw.bitrate),
     clicks: num(raw.clickcount),

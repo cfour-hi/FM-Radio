@@ -11,6 +11,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "../styles/map.css";
 import type { Station } from "../lib/types";
 import { createGlobeRadiusSync } from "./globeRadius";
+import { attachStationHover } from "./hoverTooltip";
+import { stationsAtPoint } from "./hitTest";
 import { loadGlobeDots, loadLandDots } from "../lib/landDots";
 import { loadLandShape } from "../lib/landShape";
 import {
@@ -25,6 +27,7 @@ import {
 } from "./style";
 
 export type Focus = { lon: number; lat: number; token: number };
+
 
 type Props = {
   stations: Station[];
@@ -294,6 +297,14 @@ function WorldMap({
   const mapRef = useRef<MlMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /**
+   * 世界视角定尺寸完成了没有。
+   *
+   * 建好地图后第一次 idle 会 fitWorld(false) 把镜头摆回整球；在这之前
+   * 任何 flyTo 都会被那一次复位覆盖掉（表现是「飞到一半又回去了」）。
+   * 飞行动作要等这个闸门。
+   */
+  const [worldSized, setWorldSized] = useState(false);
 
   const geo = useMemo(() => toGeoJson(stations), [stations]);
   const appliedGeoRef = useRef<StationGeoJson | null>(null);
@@ -531,11 +542,6 @@ function WorldMap({
       (window as unknown as { __map?: MlMap }).__map = map;
     }
 
-    const canvas = map.getCanvas();
-    const setCursor = (value: string) => {
-      canvas.style.cursor = value;
-    };
-
     /**
      * 世界视角的缩放值。
      *
@@ -652,6 +658,8 @@ function WorldMap({
       map.once("idle", () => {
         if (!alive) return;
         fitWorld(false);
+        // 尺寸落定，飞行动作从这一刻起才允许覆盖镜头
+        setWorldSized(true);
         readyRef.current();
       });
 
@@ -765,32 +773,18 @@ function WorldMap({
      * 否则照旧单选。取 [0] 会让其余台在交互上不存在。
      */
     map.on("click", (event) => {
-      const at = event.point;
-      const labelFeatures = map.queryRenderedFeatures(at, { layers: [LAYER.label] });
-      const hitFeatures = map.queryRenderedFeatures(at, { layers: [LAYER.hit] });
-
-      const sids: string[] = [];
-      const seen = new Set<string>();
-      for (const feature of [...labelFeatures, ...hitFeatures]) {
-        const sid = feature.properties?.["sid"] as string | undefined;
-        if (!sid || seen.has(sid)) continue;
-        seen.add(sid);
-        sids.push(sid);
-      }
-      if (sids.length === 0) return;
-
-      const stations = sids
-        .map((sid) => byIdRef.current.get(sid))
-        .filter((s): s is Station => Boolean(s));
-      if (stations.length === 0) return;
-      if (stations.length === 1) selectRef.current(stations[0]!);
-      else multiRef.current(stations);
+      // 命中的判定与悬停提示共用一份，免得「提示的是 A、点开的却是 B」
+      const hit = stationsAtPoint(map, event.point, byIdRef.current);
+      if (hit.stations.length === 0) return;
+      if (hit.stations.length === 1) selectRef.current(hit.stations[0]!);
+      else multiRef.current(hit.stations);
     });
 
-    for (const layer of [LAYER.hit, LAYER.label]) {
-      map.on("mouseenter", layer, () => setCursor("pointer"));
-      map.on("mouseleave", layer, () => setCursor(""));
-    }
+    /*
+     * 悬停提示与 cursor 都归它管：命中台才变手型，拖拽期间不写 cursor
+     * （写了会压住 MapLibre 自己的 grabbing）。
+     */
+    const detachHover = attachStationHover(map, { byId: () => byIdRef.current });
 
     /*
      * 矢量数据偶发解析失败、WebGL 上下文丢失都会走这里。这类事件是常态，
@@ -803,12 +797,15 @@ function WorldMap({
     return () => {
       alive = false;
       if (viewTimer) window.clearTimeout(viewTimer);
+      // 提示条挂在容器上，map.remove() 不会顺手带走它
+      detachHover();
       map.off("resize", onResize);
       markerRef.current?.remove();
       markerRef.current = null;
       map.remove();
       mapRef.current = null;
       setLoaded(false);
+      setWorldSized(false);
     };
   }, []);
 
@@ -849,25 +846,32 @@ function WorldMap({
    */
   useEffect(() => {
     const map = mapRef.current;
-    const marker = markerRef.current;
     if (!map || !loaded) return;
 
     const station = highlightId ? byId.get(highlightId) : null;
-    if (!station?.geo) {
-      marker?.remove();
-      markerRef.current = null;
-      return;
-    }
 
-    if (marker) {
-      marker.setLngLat([station.geo.lon, station.geo.lat]);
-      return;
-    }
+    /*
+     * 每次都重建 marker，不复用旧的。
+     *
+     * 复用只能 setLngLat，而扩散动画是 CSS 的无限循环——换台之后环不会
+     * 重新从零扩一次，用户会以为「点了没反应」。更糟的是同城的推断台可能
+     * 落在同一坐标，setLngLat 完全无变化，环就永远停在上一轮的末态。
+     * 代价只是每切一次台多创建一个 div。
+     */
+    markerRef.current?.remove();
+    markerRef.current = null;
+    if (!station?.geo) return;
 
     const el = document.createElement("div");
     el.className = "map-ping";
+    el.dataset.sid = station.id; // 端到端断言用
     el.setAttribute("aria-hidden", "true");
-    el.innerHTML = '<span class="map-ping-ring"></span><span class="map-ping-core"></span>';
+    const ring = document.createElement("span");
+    ring.className = "map-ping-ring";
+    const core = document.createElement("span");
+    core.className = "map-ping-core";
+    el.append(ring, core);
+
     markerRef.current = new Marker({ element: el, anchor: "center" })
       .setLngLat([station.geo.lon, station.geo.lat])
       .addTo(map);
@@ -876,7 +880,7 @@ function WorldMap({
   // 飞过去
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !focus) return;
+    if (!map || !focus || !worldSized) return;
     /*
      * 停在 4.8 而不是更近。
      *
@@ -890,7 +894,7 @@ function WorldMap({
       duration: prefersReducedMotion() ? 0 : 900,
       essential: true,
     });
-  }, [focus]);
+  }, [focus, worldSized]);
 
   // 回到整个世界
   useEffect(() => {

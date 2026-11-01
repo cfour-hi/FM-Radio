@@ -1,14 +1,18 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import RandomExplorer from "../components/RandomExplorer";
+import FxSwitcher from "../components/FxSwitcher";
 import Hud from "../components/Hud";
 import Starfield from "../components/Starfield";
 import MapDrawer from "../components/MapDrawer";
 import FirstRunGuide, { type GuideAction } from "../components/FirstRunGuide";
-import { loadMapCore, loadMapRest, type CoreMeta, type MapDataset } from "../lib/mapStations";
+import { loadMapCatalog, loadMapCore, loadMapRest, type CoreMeta, type MapDataset } from "../lib/mapStations";
+import { readStationId } from "../lib/deepLink";
 import { isGuideForced, shouldShowGuide } from "../lib/onboarding";
+import { prefersReducedMotion } from "../lib/motion";
 import type { Station } from "../lib/types";
 import { useMapStore } from "../store/map";
+import { useFxStore } from "../store/fx";
 import { usePlayer, readLastStation } from "../store/player";
-import type { Focus } from "../map/WorldMap";
 
 /*
  * MapLibre 那一坨接近 300KB gzip，是首页里最重的一块。
@@ -18,9 +22,15 @@ import type { Focus } from "../map/WorldMap";
 const loadWorldMap = () => import("../map/WorldMap");
 const WorldMap = lazy(loadWorldMap);
 
+/*
+ * 粒子特效场景同样懒加载：只在第一次切出地球时才下载。
+ * 特效是「另一种壁纸」，不该让每个打开首页的人都为它付流量。
+ */
+const FxScene = lazy(() => import("../fx/FxScene"));
+
 /** 右上角那排图标按钮长得一样，样式收在一处 */
 const ICON_BUTTON =
-  "pointer-events-auto grid h-8 w-8 place-items-center rounded-[6px] border bg-base/55 backdrop-blur transition-colors";
+  "pointer-events-auto grid h-11 w-11 sm:h-8 sm:w-8 place-items-center rounded-[6px] border bg-base/55 backdrop-blur transition-colors";
 
 /* meta 还没加载出来时的兜底，模块级只建一次，避免每次渲染都新建 Map 触发重算 */
 const EMPTY_STATIONS: Station[] = [];
@@ -32,15 +42,22 @@ export default function MapPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [focus, setFocus] = useState<Focus | null>(null);
   const [retry, setRetry] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [multiStations, setMultiStations] = useState<Station[] | null>(null);
   const [view, setView] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [linkMiss, setLinkMiss] = useState(false);
   const guideAsked = useRef(false);
   const flyHomeToken = useMapStore((s) => s.flyHomeToken);
   const flyHome = useMapStore((s) => s.flyHome);
+  /** 镜头请求的唯一来源：播放条点标题、分享链接，都往这里写 */
+  const focus = useMapStore((s) => s.focus);
+  const focusStation = useMapStore((s) => s.focusStation);
+  const searchFocusToken = useMapStore((s) => s.searchFocusToken);
+  /** 分享链接点名的台；读一次就定，后续 URL 变化不重新解析 */
+  const deepId = useMemo(() => readStationId(), []);
+  const deepDone = useRef<string | null>(null);
   /**
    * 台名默认开着。
    *
@@ -49,6 +66,35 @@ export default function MapPage() {
    * 密度交给避让算法：两千个台写不下，它会挑点击量高的先占位。
    */
   const [showLabels, setShowLabels] = useState(true);
+
+  /*
+   * 特效切换。
+   *
+   * globe 是地图本体；切到粒子特效时地图层淡出但**不卸载**——MapLibre
+   * 静止不动时几乎零 GPU 开销，而卸了重挂要重新走一遍「建图 → 字体 →
+   * 陆地 → 粒子 → 定尺寸」，切回来至少白屏一秒。CSS 交叉淡入淡出
+   * （reduced-motion 直接硬切），两层同时在场，靠 opacity 分谁在上。
+   */
+  const fxId = useFxStore((s) => s.fxId);
+  const fxActive = fxId !== "globe";
+  /*
+   * 特效层「在场」标记：进场立即挂载（淡入需要它在 DOM 里），退场要等
+   * 淡出播完再摘——立刻卸载会让淡出动画跳变成硬切。reduced-motion 时
+   * 过渡时长是 0，直接同步翻转即可。
+   */
+  const [fxMounted, setFxMounted] = useState(fxActive);
+  useEffect(() => {
+    if (fxActive) {
+      setFxMounted(true);
+      return;
+    }
+    if (prefersReducedMotion()) {
+      setFxMounted(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setFxMounted(false), 720);
+    return () => window.clearTimeout(timer);
+  }, [fxActive]);
 
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
@@ -124,6 +170,8 @@ export default function MapPage() {
     // 上线前就用过站的人没有引导标记但有上次电台，视为「已上手」不再打扰；
     // 但 ?guide=1 是明确要求重看，不能被这层迁移规则拦掉。
     if (!isGuideForced() && readLastStation()) return;
+    // 分享链接点名了某个台：别用一张欢迎卡盖住它
+    if (readStationId() && !isGuideForced()) return;
     setGuideOpen(true);
   }, [data, loadError, mapError]);
 
@@ -148,11 +196,12 @@ export default function MapPage() {
     [currentId, play, stations, toggle],
   );
 
-  const flyToStation = useCallback((station: Station) => {
-    if (station.geo) {
-      setFocus({ lon: station.geo.lon, lat: station.geo.lat, token: Date.now() });
-    }
-  }, []);
+  const flyToStation = useCallback(
+    (station: Station) => {
+      if (station.geo) focusStation(station.geo);
+    },
+    [focusStation],
+  );
 
   /*
    * 点图上的光是「点哪听哪」，和列表行点击一致：不让人先点一下再点一下。
@@ -198,10 +247,57 @@ export default function MapPage() {
   const finishGuide = useCallback(
     (action: GuideAction) => {
       setGuideOpen(false);
-      if (action === "random") randomOnMap();
+      // 分享链接点名了台，就别让「随机点亮」把它顶掉
+      if (action === "random" && !deepId) randomOnMap();
     },
-    [randomOnMap],
+    [randomOnMap, deepId],
   );
+
+  /*
+   * 分享链接：?s=<stationId>
+   *
+   * 时序上有三道闸门：core 数据到齐（否则查不到台）、deepDone（StrictMode
+   * 与 rest 合并都会让 effect 重跑，只处理一次）、以及 WorldMap 内部的
+   * worldSized（镜头复位完成后才允许飞）。
+   *
+   * 播放用 store 的 play 而不是 playStation：后者对同一台是 toggle，
+   * 而 App 侧已经跳过了 lastStation 恢复，这里再 toggle 就会「播了又停」。
+   */
+  useEffect(() => {
+    if (!deepId || !data || deepDone.current === deepId) return;
+    deepDone.current = deepId;
+
+    const local = data.byId.get(deepId);
+    if (local) {
+      if (usePlayer.getState().station?.id !== local.id) play(local, data.stations);
+      if (local.geo) focusStation(local.geo);
+      return;
+    }
+
+    // 有坐标的台都在 core/rest 里，本地找不到才去翻无坐标目录（只能播、不能飞）
+    void loadMapCatalog()
+      .then((catalog) => {
+        const hit = catalog.find((s) => s.id === deepId);
+        if (!hit) {
+          setLinkMiss(true);
+          return;
+        }
+        if (usePlayer.getState().station?.id !== hit.id) play(hit, catalog);
+      })
+      .catch(() => setLinkMiss(true));
+  }, [deepId, data, play, focusStation]);
+
+  useEffect(() => {
+    if (!linkMiss) return;
+    const timer = window.setTimeout(() => setLinkMiss(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [linkMiss]);
+
+  /* 「/」在抽屉关着时也能直接进搜索：先开抽屉，由抽屉把焦点送进输入框 */
+  useEffect(() => {
+    if (searchFocusToken === 0) return;
+    setDrawerOpen(true);
+  }, [searchFocusToken]);
 
   /*
    * 高亮跟随正在播的台。
@@ -234,46 +330,78 @@ export default function MapPage() {
         或者打开电台面板搜索挑选。
       </p>
 
-      {!loadError && data && (
-        <Suspense
-          fallback={
-            <div className="absolute inset-0 z-10 grid place-items-center bg-base-2">
-              <div className="text-center">
-                <span className="tuning-ring mx-auto" aria-hidden />
-                <p className="num mt-4 text-[11px] uppercase tracking-[0.18em] text-cold">铺开地球</p>
+      {/*
+       * 地球层：MapLibre 球体 + 它的太空氛围（星云/星空/明暗/暗角）。
+       * 切到粒子特效时整层淡出但保持挂载——地图不卸载，切回秒出。
+       */}
+      <div
+        className={`fx-layer ${fxActive ? "fx-layer-hidden" : "fx-layer-active"}`}
+        aria-hidden={fxActive}
+      >
+        {!loadError && data && (
+          <Suspense
+            fallback={
+              <div className="absolute inset-0 z-10 grid place-items-center bg-base-2">
+                <div className="text-center">
+                  <span className="tuning-ring mx-auto" aria-hidden />
+                  <p className="num mt-4 text-[11px] uppercase tracking-[0.18em] text-cold">铺开地球</p>
+                </div>
               </div>
-            </div>
-          }
-        >
-          <WorldMap
-            stations={stations}
-            highlightId={highlightId}
-            focus={focus}
-            resetToken={flyHomeToken}
-            showLabels={showLabels}
-            onSelect={handleMapSelect}
-            onMultiSelect={handleMultiSelect}
-            onViewChange={setView}
-            onReady={handleReady}
-            onFail={setMapError}
-          />
-        </Suspense>
+            }
+          >
+            <WorldMap
+              stations={stations}
+              highlightId={highlightId}
+              focus={focus}
+              resetToken={flyHomeToken}
+              showLabels={showLabels}
+              onSelect={handleMapSelect}
+              onMultiSelect={handleMultiSelect}
+              onViewChange={setView}
+              onReady={handleReady}
+              onFail={setMapError}
+            />
+          </Suspense>
+        )}
+
+        {/* 太空星云：淡色云气垫底，柔化球外空旷，blur 后自然形成球体边缘的柔光 */}
+        <div aria-hidden className="map-nebula pointer-events-none absolute inset-0 z-[4]" />
+
+        {/* 太空星空：铺满窗口、中心镂空露出球体，只让星星待在球外 */}
+        <Starfield />
+
+        {/* 球体明暗：左上受光、右下阴影，让球有体积感而不是一张平贴图 */}
+        <div aria-hidden className="map-shading pointer-events-none absolute inset-0 z-10" />
+
+        {/* 边缘压暗，让球体浮在夜空中，而不是一张贴满屏幕的贴图 */}
+        <div aria-hidden className="map-vignette pointer-events-none absolute inset-0 z-10" />
+      </div>
+
+      {/*
+       * 粒子特效层：fxId 是 globe 时不挂载（地球模式没有这层）。
+       * 地图与特效互斥：特效在场时整层接住点击，指针事件不会落到地图上。
+       */}
+      {fxMounted && (
+        <div className={`fx-layer ${fxActive ? "fx-layer-active" : "fx-layer-hidden"}`}>
+          <Suspense fallback={null}>
+            <FxScene stations={stations} onSelect={handleMapSelect} onMultiSelect={handleMultiSelect} />
+          </Suspense>
+        </div>
       )}
 
-      {/* 太空星云：淡色云气垫底，柔化球外空旷，blur 后自然形成球体边缘的柔光 */}
-      <div aria-hidden className="map-nebula pointer-events-none absolute inset-0 z-[4]" />
-
-      {/* 太空星空：铺满窗口、中心镂空露出球体，只让星星待在球外 */}
-      <Starfield />
-
-      {/* 球体明暗：左上受光、右下阴影，让球有体积感而不是一张平贴图 */}
-      <div aria-hidden className="map-shading pointer-events-none absolute inset-0 z-10" />
-
-      {/* 边缘压暗，让球体浮在夜空中，而不是一张贴满屏幕的贴图 */}
-      <div aria-hidden className="map-vignette pointer-events-none absolute inset-0 z-10" />
-
       {/* 四角角标 + 经纬度读数 */}
-      <Hud view={view} total={stations.length} />
+      <Hud view={fxActive ? null : view} total={stations.length} fxName={fxActive ? fxId : null} />
+
+      {/*
+       * 快捷键提示。
+       *
+       * 空格播放、N/P 切台、M 静音、/ 搜索都实现了，但界面上一个字都没写——
+       * 不写就等于没有。放右下角版权条上方：那里本来是空的，也不压球体
+       * 构图。bottom-[36px] 是版权条顶边（约 30px）再加 6px 间隙。
+       */}
+      <p className="num pointer-events-none absolute bottom-[36px] right-2 z-20 hidden text-[10px] tracking-[0.14em] text-dim sm:block">
+        空格 播放 · N 下一台 · P 上一站 · M 静音 · / 搜索
+      </p>
 
       {/*
        * 右上角操作：只留图标，文字交给 aria-label 和 title。
@@ -284,7 +412,7 @@ export default function MapPage() {
        * 按钮组顶边与左上角 Header 胶囊对齐（sm:top-6 / 移动端 top-4），
        * 和中间的 HUD 读数组成一条齐平的顶部仪表带。
        */}
-      <div className="pointer-events-none absolute right-3 top-4 z-20 flex items-center gap-1.5 sm:right-5 sm:top-6">
+      <div className="pointer-events-none absolute right-2 top-3 z-20 flex items-center gap-1 sm:gap-1.5 sm:right-5 sm:top-6">
         {/* 电台面板：右侧抽屉 */}
         <button
           type="button"
@@ -311,84 +439,65 @@ export default function MapPage() {
           </svg>
         </button>
 
-        {/* 随机点亮：骰子 */}
-        <button
-          type="button"
-          onClick={randomOnMap}
-          disabled={stations.length === 0}
-          aria-label="随机点亮一个台"
-          title="随机点亮"
-          className={`${ICON_BUTTON} border-signal/30 text-signal hover:border-signal/60 disabled:opacity-40`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-[15px] w-[15px]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <rect x="4" y="4" width="16" height="16" rx="3.5" />
-            <circle cx="8.5" cy="8.5" r="1.05" fill="currentColor" stroke="none" />
-            <circle cx="15.5" cy="8.5" r="1.05" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="12" r="1.05" fill="currentColor" stroke="none" />
-            <circle cx="8.5" cy="15.5" r="1.05" fill="currentColor" stroke="none" />
-            <circle cx="15.5" cy="15.5" r="1.05" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
+        <RandomExplorer stations={stations} onLocate={flyToStation} panelOpen={drawerOpen} />
 
-        {/* 台名开关：眼睛，关掉时加一道斜线 */}
-        <button
-          type="button"
-          onClick={() => setShowLabels((v) => !v)}
-          aria-pressed={showLabels}
-          aria-label={showLabels ? "隐藏台名" : "显示台名"}
-          title={showLabels ? "隐藏台名" : "显示台名"}
-          className={`${ICON_BUTTON} ${
-            showLabels ? "border-signal/40 text-ink" : "border-line text-muted hover:text-ink"
-          }`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-[15px] w-[15px]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M2.8 12s3.4-6 9.2-6 9.2 6 9.2 6-3.4 6-9.2 6-9.2-6-9.2-6z" />
-            <circle cx="12" cy="12" r="2.6" />
-            {!showLabels && <path d="M4 4l16 16" />}
-          </svg>
-        </button>
+        {/* 特效切换：粒子特效模式下才有电台点开关等选项 */}
+        <FxSwitcher panelOpen={drawerOpen} />
 
-        {/* 回到世界：地球 */}
-        <button
-          type="button"
-          onClick={flyHome}
-          aria-label="回到世界"
-          title="回到世界"
-          className={`${ICON_BUTTON} border-line text-muted hover:text-ink`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-[15px] w-[15px]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
+        {/* 台名开关：眼睛，关掉时加一道斜线；只在地球模式有意义 */}
+        {!fxActive && (
+          <button
+            type="button"
+            onClick={() => setShowLabels((v) => !v)}
+            aria-pressed={showLabels}
+            aria-label={showLabels ? "隐藏台名" : "显示台名"}
+            title={showLabels ? "隐藏台名" : "显示台名"}
+            className={`${ICON_BUTTON} ${
+              showLabels ? "border-signal/40 text-ink" : "border-line text-muted hover:text-ink"
+            }`}
           >
-            <circle cx="12" cy="12" r="8.5" />
-            <path d="M3.5 12h17" />
-            <path d="M12 3.5c2.3 2.4 3.5 5.3 3.5 8.5S14.3 18.1 12 20.5c-2.3-2.4-3.5-5.3-3.5-8.5S9.7 5.9 12 3.5z" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[15px] w-[15px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2.8 12s3.4-6 9.2-6 9.2 6 9.2 6-3.4 6-9.2 6-9.2-6-9.2-6z" />
+              <circle cx="12" cy="12" r="2.6" />
+              {!showLabels && <path d="M4 4l16 16" />}
+            </svg>
+          </button>
+        )}
+
+        {/* 回到世界：地球；粒子特效模式下没有「世界视角」可回 */}
+        {!fxActive && (
+          <button
+            type="button"
+            onClick={flyHome}
+            aria-label="回到世界"
+            title="回到世界"
+            className={`${ICON_BUTTON} border-line text-muted hover:text-ink`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[15px] w-[15px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M3.5 12h17" />
+              <path d="M12 3.5c2.3 2.4 3.5 5.3 3.5 8.5S14.3 18.1 12 20.5c-2.3-2.4-3.5-5.3-3.5-8.5S9.7 5.9 12 3.5z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* 电台面板：附近 / 收藏 / 最近 / 搜索 */}
@@ -400,7 +509,17 @@ export default function MapPage() {
         onPickStation={handlePickStation}
         multiStations={multiStations}
         onClearMulti={clearMulti}
+        searchFocusToken={searchFocusToken}
       />
+
+      {/* 分享链接里的台找不到：一句轻提示，四秒后自己消失，不弹窗 */}
+      {linkMiss && (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-30 -translate-y-1/2 text-center">
+          <span className="num inline-block rounded-[6px] border border-line bg-base/85 px-3 py-2 text-[11px] tracking-[0.1em] text-muted">
+            链接里的电台找不到了
+          </span>
+        </div>
+      )}
 
       {/* 加载 / 失败 */}
       {loadError && (

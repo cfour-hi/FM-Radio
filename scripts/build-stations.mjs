@@ -41,10 +41,10 @@ const MAX_PAGES = 100;
 /** core 里境外台的条数上限（中国台全部进 core，不占这个额度）。 */
 const CORE_FOREIGN = 3000;
 
-/* 18 列，与老 map-stations.json 的 fields 完全一致，前端 decode 可复用 */
+/* 前 18 列保持兼容，追加语言与类型原始元数据。 */
 const FIELDS = [
   "id", "name", "url", "cc", "country", "codec", "bitrate", "lat", "lon",
-  "clicks", "hls", "sslError", "state", "approx", "place", "province", "city", "prec",
+  "clicks", "hls", "sslError", "state", "approx", "place", "province", "city", "prec", "languages", "tags",
 ];
 
 const toRow = (s) => [
@@ -66,6 +66,8 @@ const toRow = (s) => [
   s.province ?? "",
   s.city ?? "",
   s.geoPrecision === "city" ? 0 : s.geoPrecision === "province" ? 1 : 2,
+  s.languages || "",
+  s.tags || "",
 ];
 
 /** 不带 countrycode，按点击量倒序翻页拉全量。 */
@@ -204,8 +206,8 @@ async function main() {
   });
   const catalogBody = JSON.stringify({
     ...base,
-    fields: ["id", "name", "cc", "clicks", "url"],
-    stations: catalog.map((s) => [s.id, s.name, s.countryCode, s.clicks, s.url]),
+    fields: ["id", "name", "cc", "clicks", "url", "languages", "tags"],
+    stations: catalog.map((s) => [s.id, s.name, s.countryCode, s.clicks, s.url, s.languages || "", s.tags || ""]),
   });
 
   await writeFile(resolve(OUT_DIR, "stations-core.json"), coreBody);

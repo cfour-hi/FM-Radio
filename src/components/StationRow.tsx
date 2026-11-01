@@ -1,6 +1,6 @@
 import { memo, type CSSProperties } from "react";
 import { checkSupport, cautionOf } from "../lib/capability";
-import { regionLabel } from "../lib/cnEnrichment";
+import { flagOf, splitHighlight, stationMeta } from "../lib/stationMeta";
 import type { Station } from "../lib/types";
 import { usePlayer } from "../store/player";
 import { useLibrary } from "../store/library";
@@ -8,49 +8,12 @@ import { useLibrary } from "../store/library";
 /** 行高固定，虚拟滚动才能只靠乘法定位 */
 export const ROW_HEIGHT = 60;
 
-/** 把国家代码转成旗帜；非两位字母就原样返回 */
-export function flagOf(code: string): string {
-  if (!/^[A-Za-z]{2}$/.test(code)) return "";
-  const base = 0x1f1e6;
-  const chars = [...code.toUpperCase()].map((c) => base + c.charCodeAt(0) - 65);
-  return String.fromCodePoint(...chars);
-}
-
-/**
- * 国家名和首个标签经常重复（France / french / france），去重后再拼。
- *
- * 有省市归属的中国台，第一段换成「湖南 · 长沙」，不写国家——
- * 「China」对一个想找本省电台的人没有任何信息量，而省市才是他要的那一栏。
+/*
+ * flagOf / stationMeta 原先定义在这里。为了让地图的悬停提示条能复用它们、
+ * 又不把 player store 和 Dexie 一起拖进地图的 lazy chunk，实体搬去了
+ * lib/stationMeta。这里保留同名导出，老的 import 不用改。
  */
-export function stationMeta(station: Station): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const region = regionOf(station);
-  const parts = [region || station.countryName || station.countryCode, station.languages[0], station.tags[0]];
-  for (const part of parts) {
-    const value = part?.trim();
-    if (!value) continue;
-    const key = value.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(value);
-  }
-  return out;
-}
-
-/**
- * 归属的展示串。
- *
- * 只知道省的时候不写城市：那个城市值是给落点用的省会，写出来就是在
- * 假装我们知道得比实际更多。
- */
-export function regionOf(station: Station): string {
-  if (!station.province) return "";
-  const province = regionLabel(station.province);
-  if (station.geoPrecision === "province") return province;
-  if (!station.city || station.city === station.province) return province;
-  return `${province} · ${station.city}`;
-}
+export { flagOf, stationMeta };
 
 type Props = {
   station: Station;
@@ -64,6 +27,10 @@ type Props = {
   onPick?: (station: Station) => void;
   /** meta 行末尾追加的提示，如「无法定位」 */
   note?: string;
+  /** 搜索结果高亮用；为空则不切分 */
+  query?: string | undefined;
+  /** 键盘浏览时当前停在这一行 */
+  active?: boolean;
 };
 
 function PlayingBars() {
@@ -78,7 +45,17 @@ function PlayingBars() {
   );
 }
 
-function StationRow({ station, index, queue, style, compact = false, onPick, note }: Props) {
+function StationRow({
+  station,
+  index,
+  queue,
+  style,
+  compact = false,
+  onPick,
+  note,
+  query,
+  active = false,
+}: Props) {
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
   const isCurrent = usePlayer((s) => s.station?.id === station.id);
@@ -93,6 +70,7 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
   const busy = isCurrent && (currentStatus === "tuning" || currentStatus === "buffering");
 
   const meta = stationMeta(station);
+  const segments = query ? splitHighlight(station.name, query) : null;
   // 虚拟滚动时由外层给定绝对定位；普通列表（收藏页）按文档流排列
   const virtual = style !== undefined;
 
@@ -108,8 +86,13 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
   return (
     <li
       style={style}
-      className={`${virtual ? "absolute inset-x-0 top-0" : "relative"} flex ${compact ? "h-[52px]" : "h-[60px]"} items-center border-b border-line-soft`}
+      role="option"
+      aria-selected={active}
+      className={`${virtual ? "absolute inset-x-0 top-0" : "relative"} flex ${compact ? "h-[52px]" : "h-[60px]"} items-center border-b border-line-soft ${
+        active ? "bg-surface/80 ring-1 ring-inset ring-signal/40" : ""
+      }`}
       data-row={station.id}
+      data-active={active ? "1" : undefined}
     >
       {/* 整行是一个按钮，收藏是它的兄弟节点：按钮不能嵌套按钮 */}
       <button
@@ -122,7 +105,7 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
       >
         {!compact && (
           <span
-            className={`num flex w-7 shrink-0 justify-end text-[11px] ${
+            className={`num flex w-7 shrink-0 justify-end text-[12px] ${
               isCurrent ? "text-signal" : "text-dim"
             }`}
           >
@@ -136,9 +119,19 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
 
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[13px] ${isCurrent ? "text-signal" : "text-ink"}`}>
-            {station.name}
+            {segments
+              ? segments.map((segment, i) =>
+                  segment.hit ? (
+                    <mark key={i} className="bg-signal/25 text-ink">
+                      {segment.text}
+                    </mark>
+                  ) : (
+                    <span key={i}>{segment.text}</span>
+                  ),
+                )
+              : station.name}
           </span>
-          <span className="block truncate text-[11px] text-dim">
+          <span className="block truncate text-[12px] text-dim">
             {meta.join(" · ")}
             {caution && <span className="text-cold"> · {caution}</span>}
             {note && <span className="text-cold"> · {note}</span>}
@@ -153,8 +146,8 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
 
         {!compact && (
           <span className="hidden shrink-0 items-center gap-3 sm:flex">
-            <span className="num text-[11px] text-dim">{station.codec}</span>
-            <span className="num w-10 text-right text-[11px] tabular-nums text-muted">
+            <span className="num text-[12px] text-dim">{station.codec}</span>
+            <span className="num w-10 text-right text-[12px] tabular-nums text-muted">
               {station.bitrate > 0 ? `${station.bitrate}k` : "—"}
             </span>
           </span>
@@ -186,7 +179,7 @@ function StationRow({ station, index, queue, style, compact = false, onPick, not
         onClick={() => void toggleFavorite(station)}
         aria-label={favorite ? "取消收藏" : "收藏"}
         aria-pressed={favorite}
-        className={`mr-2 grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors ${
+        className={`mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors ${
           favorite ? "text-signal" : "text-dim hover:text-muted"
         }`}
       >

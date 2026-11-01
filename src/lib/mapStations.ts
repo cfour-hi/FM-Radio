@@ -46,10 +46,12 @@ import coreUrl from "../data/stations-core.json?url";
 import restUrl from "../data/stations-rest.json?url";
 import catalogUrl from "../data/stations-catalog.json?url";
 
+const tokens = (value: unknown): string[] => typeof value === "string" ? [...new Set(value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean))] : [];
+
 const text = (v: unknown): string => (typeof v === "string" ? v : "");
 const number = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
 
-/** 18 列地图行 → Station。列序见 build-stations.mjs 的 FIELDS。 */
+/** 20 列地图行（兼容旧 18 列） → Station。列序见 build-stations.mjs 的 FIELDS。 */
 function decodeMapRows(rows: (string | number)[][]): Station[] {
   const out: Station[] = [];
   for (const row of rows) {
@@ -69,8 +71,8 @@ function decodeMapRows(rows: (string | number)[][]): Station[] {
       countryCode: text(row[3]).toUpperCase(),
       countryName: text(row[4]),
       state: text(row[12]) || null,
-      languages: [],
-      tags: [],
+      languages: tokens(row[18]),
+      tags: tokens(row[19]),
       codec: text(row[5]) || "UNKNOWN",
       bitrate: number(row[6]),
       votes: 0,
@@ -89,7 +91,7 @@ function decodeMapRows(rows: (string | number)[][]): Station[] {
   return out;
 }
 
-/** 5 列 catalog 行 → Station（无坐标、无省市，仅用于搜索与播放）。 */
+/** 7 列 catalog 行（兼容旧 5 列） → Station（无坐标、无省市，仅用于搜索与播放）。 */
 function decodeCatalogRows(rows: (string | number)[][]): Station[] {
   const out: Station[] = [];
   for (const row of rows) {
@@ -105,8 +107,8 @@ function decodeCatalogRows(rows: (string | number)[][]): Station[] {
       countryCode: text(row[2]).toUpperCase(),
       countryName: "",
       state: null,
-      languages: [],
-      tags: [],
+      languages: tokens(row[5]),
+      tags: tokens(row[6]),
       codec: "UNKNOWN",
       bitrate: 0,
       votes: 0,

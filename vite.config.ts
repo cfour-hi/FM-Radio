@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss(), siteUrlPlugin(siteUrl)],
-    server: { port: 5173 },
+    server: { port: 5555 },
     optimizeDeps: {
       /*
        * maplibre-gl 用 new URL("./maplibre-gl-worker.mjs", import.meta.url) 找自己的

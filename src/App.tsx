@@ -5,7 +5,9 @@ import PlayerBar from "./components/PlayerBar";
 import RouteEffects from "./components/RouteEffects";
 import MapPage from "./pages/MapPage";
 import NotFound from "./pages/NotFound";
+import { useSleepTimer } from "./hooks/useSleepTimer";
 import { useGlobalKeys } from "./hooks/useGlobalKeys";
+import { readStationId } from "./lib/deepLink";
 import { useLibrary } from "./store/library";
 import { usePlayer, readLastStation } from "./store/player";
 
@@ -28,6 +30,7 @@ export default function App() {
   const status = usePlayer((s) => s.status);
 
   useGlobalKeys();
+  useSleepTimer();
 
   useEffect(() => {
     void hydrate();
@@ -38,8 +41,18 @@ export default function App() {
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
+    /*
+     * 分享链接点名了某个台：播放权交给 MapPage。
+     *
+     * 两条路都播的话，第二次 play 会落到「点的是正在播的那台 → 暂停」这条
+     * 分支上，用户看到的是「打开就静音」。
+     */
+    if (readStationId()) return;
     const last = readLastStation();
-    if (last) usePlayer.getState().play(last);
+    if (last) {
+      if (usePlayer.getState().sleepExpired) usePlayer.setState({ station: last, status: "paused" });
+      else usePlayer.getState().play(last);
+    }
   }, []);
 
   // 真正出声之后才记入「最近听过」，调谐失败的不算

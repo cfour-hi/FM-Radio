@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useMapStore } from "../store/map";
 import { usePlayer } from "../store/player";
 
 /**
@@ -57,17 +58,21 @@ export function useGlobalKeys(): void {
           player.next(1);
           return;
         case "p":
-          player.next(-1);
+          player.previous();
           return;
         case "m":
           player.toggleMute();
           return;
         case "/": {
-          const input = document.querySelector<HTMLInputElement>(SEARCH_SELECTOR);
-          if (!input) return;
           event.preventDefault();
-          input.focus();
-          input.select();
+          const input = document.querySelector<HTMLInputElement>(SEARCH_SELECTOR);
+          if (input) {
+            input.focus();
+            input.select();
+            return;
+          }
+          // 抽屉没开：让页面先把它打开，抽屉挂载后会把焦点接过去
+          useMapStore.getState().focusSearch();
           return;
         }
         default:

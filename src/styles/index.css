@@ -9,7 +9,7 @@
   --color-line-soft: #171a21;
   --color-ink: #e7e9ee;
   --color-muted: #8b929d;
-  --color-dim: #565d68;
+  --color-dim: #929aa7;
   --color-signal: #f0a63c;
   --color-signal-soft: #2a2013;
   --color-cold: #5aa9c9;
@@ -25,6 +25,13 @@
   html {
     color-scheme: dark;
     -webkit-font-smoothing: antialiased;
+    /*
+     * 底部被播放条占掉的高度，由 PlayerBar 在运行时改写。
+     *
+     * 先给 0 是为了不闪：地图版权条要等地图 chunk 到齐才出现，那时如果变量
+     * 还不存在，它会先按「没有播放条」摆一次再跳上来。
+     */
+    --player-bar-h: 0px;
   }
 
   body {
@@ -128,8 +135,17 @@
   .glass-panel {
     position: relative;
     background: color-mix(in srgb, var(--color-surface) 72%, transparent);
-    backdrop-filter: blur(14px);
+    /*
+     * 前缀在前，标准名在后，不能反过来。
+     *
+     * 构建期的 CSS 压缩把两者当成同一个属性的两种写法，只保留后一条。
+     * 写成「标准名在前、前缀在后」，产物里就只剩 -webkit-backdrop-filter，
+     * 而 Chrome 并不认这个别名——面板的模糊会静默消失，只剩一层 72% 的底，
+     * 底图上的台名直接透上来，读不清。（.guide-dialog::backdrop 一直是
+     * 前缀在前，所以它没出这个问题。）
+     */
     -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
     border: 1px solid var(--color-line);
   }
   .glass-panel::before {
@@ -143,6 +159,127 @@
     border-left: 1.5px solid var(--color-signal);
     opacity: 0.55;
     pointer-events: none;
+  }
+
+  /*
+   * 抽屉的位移。
+   *
+   * 走一个变量而不是直接写 transform：手势要逐帧写 px（跟手），
+   * 入场退场要写 100%（与自身宽度无关，桌面 360px 也照样对）。
+   * 两条路写同一个变量，浏览器才能在「跟手 → 松手」之间连续插值，
+   * 否则松手那一瞬间会跳一下。
+   *
+   * 用 transition 而不是 @keyframes：动画重放会从屏外重新开始，而过渡永远
+   * 从当前计算值出发——关闭到一半再打开，会顺滑地倒回去。
+   */
+  .drawer {
+    transform: translateX(var(--drawer-x, 0%));
+    transition: transform 180ms ease-out;
+    /*
+     * 纵向手势交还给浏览器（列表滚动本来就该是原生的），横向留给 JS。
+     * 不给这条声明的话，浏览器拿到 pointerdown 就默认整块都能滚，
+     * 我们这边永远锁不到 x 轴。
+     */
+    touch-action: pan-y;
+    /* 列表滚到头时别把整个页面往下拽（下拉刷新会打断收听） */
+    overscroll-behavior: contain;
+  }
+
+  .drawer[data-state="enter"],
+  .drawer[data-state="closing"] {
+    --drawer-x: 100%;
+  }
+
+  /* 滑出去的过程中别再吃点击，否则半透明面板上还能误触到列表 */
+  .drawer[data-state="closing"] {
+    pointer-events: none;
+  }
+
+  /*
+   * 跟手时把玻璃关掉。
+   *
+   * backdrop-filter 每帧都要对 WebGL canvas 做一次离屏取样，拖动时 60fps
+   * 全在算这笔账，手机上付不起；快速位移中退成实色底根本看不出来。
+   * 同时把过渡关掉，否则位移永远慢半拍。
+   */
+  .drawer[data-dragging="true"] {
+    transition: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+    user-select: none;
+  }
+
+  @media (max-width: 639.98px) {
+    /* 手机品牌与工具栏共用顶部 56px，面板在其下方留 12px 间距。 */
+    .drawer {
+      top: 68px;
+    }
+
+    /*
+     * 列表最后一行别贴着播放条。
+     *
+     * 播放条是根层 fixed，抽屉在 .map-shell 里，压不过它——那就把内容抬起来。
+     * 写在滚动容器上而不是内层列表上：容器的 padding 属于可滚动区域，
+     * 滚到底时能真正露出来。
+     */
+    .drawer [data-drawer-scroll] {
+      padding-bottom: calc(var(--player-bar-h, 0px) + 8px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .drawer {
+      transition: none;
+    }
+  }
+
+  /*
+   * 播放条的收起。
+   *
+   * 收起不改高度，只做 translateY：改动 layout 会让地图重新排版，也不符合
+   * 这个项目「只动 opacity / transform」的既有规范。
+   *
+   * 全部规则锁在窄屏媒体查询里，桌面端一个像素都不碰——那边是左下角浮卡，
+   * 没有收起这回事。
+   */
+  @media (max-width: 639.98px) {
+    .player-bar {
+      transform: translateY(var(--bar-y, 0px));
+      transition: transform 180ms ease-out;
+      /* 条内没有可滚内容，纵向手势全归 JS */
+      touch-action: none;
+    }
+
+    /*
+     * 收起位置用自身高度算。
+     *
+     * 100% 里已经含了安全区的 padding，扣掉它才不会把把手顶到屏幕外面——
+     * 露出的 28px 要落在 home indicator 之上，而不是被它盖住。
+     */
+    .player-bar[data-collapsed="true"] {
+      --bar-y: calc(100% - 56px - env(safe-area-inset-bottom, 0px));
+    }
+
+    .player-bar[data-dragging="true"] {
+      transition: none;
+      user-select: none;
+    }
+
+    /* 收起后由独立迷你播放器承接，完整控制区不可交互。 */
+    #player-body {
+      transition: opacity 120ms linear;
+    }
+    .player-bar[data-collapsed="true"]:not([data-dragging="true"]) #player-body {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .player-bar,
+    #player-body {
+      transition: none;
+    }
   }
 
   /*
@@ -278,6 +415,17 @@
     border-top-color: var(--color-signal);
     animation: spin 0.9s linear infinite;
   }
+  
+  .tuning-ring-inline {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1.2px solid color-mix(in srgb, var(--color-cold) 28%, transparent);
+    border-top-color: var(--color-cold);
+    animation: spin 0.9s linear infinite;
+    vertical-align: middle;
+  }
 
   @keyframes spin {
     to {
@@ -314,6 +462,23 @@
     background: var(--color-muted);
   }
 
+  /*
+   * 定时下拉：去掉浏览器原生箭头，换成和整机图标一致的细线 chevron。
+   * 背景色仍由组件里的 bg-base 控制，这里只接管外观和箭头。
+   */
+  .sleep-select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b929d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+    background-size: 10px 10px;
+    padding-right: 22px;
+  }
+  .sleep-select:hover {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f0a63c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .eq i,
     .tuner-marker,
@@ -324,4 +489,14 @@
       border-top-color: var(--color-signal);
     }
   }
+}
+
+/* 手机面板为阅读提供稳定背景，迷你播放器始终保留控制。 */
+@media (max-width: 639.98px) {
+  .drawer { background: #0e1118; }
+  .mini-player { z-index: 2; background: #0e1118; }
+}
+button:focus-visible, summary:focus-visible, select:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
 }

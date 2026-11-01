@@ -1,3 +1,4 @@
+import { APP_NAME } from "../lib/brand";
 import type { Station } from "../lib/types";
 import type { EngineStatus } from "./engine";
 
@@ -30,7 +31,7 @@ function artworkOf(station: Station): MediaImage[] {
 
 function subtitleOf(station: Station): string {
   const parts = [station.countryName || station.countryCode, station.languages[0]].filter(Boolean);
-  return parts.join(" · ") || "全球 FM";
+  return parts.join(" · ") || APP_NAME;
 }
 
 export function syncMediaSession(station: Station | null, status: EngineStatus): void {
@@ -46,7 +47,7 @@ export function syncMediaSession(station: Station | null, status: EngineStatus):
     navigator.mediaSession.metadata = new MediaMetadata({
       title: station.name,
       artist: subtitleOf(station),
-      album: station.tags.slice(0, 2).join(" · ") || "FM Radio",
+      album: station.tags.slice(0, 2).join(" · ") || APP_NAME,
       artwork: artworkOf(station),
     });
 
