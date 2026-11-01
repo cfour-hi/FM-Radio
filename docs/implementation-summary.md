@@ -151,4 +151,4 @@ pnpm preview
 
 1. **HTTPS 要求**：Media Session API 和 Geolocation API 需要安全上下文（HTTPS 或 localhost）
 2. **隐私模式**：localStorage 在隐私模式下可能不可用，代码已处理静默失败
-3. **数据迁移**：从 IndexedDB 切换到 localStorage 后，旧收藏数据不会自动迁移（如需迁移可手动导出导入）
+3. **数据迁移**：启动时会一次性把 IndexedDB 里的旧收藏合并进 localStorage（按 id 去重，localStorage 已有的优先），完成后写入 `fm-radio.favoritesMigrated` 标记，之后不再读取旧表；清空 localStorage 会重新迁移

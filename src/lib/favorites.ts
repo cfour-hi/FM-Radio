@@ -10,6 +10,8 @@ import type { Station } from "./types";
  */
 
 const FAVORITES_KEY = "fm-radio.favorites";
+/** 旧 IndexedDB 收藏是否已经并进来；清掉 localStorage 后会重新迁移。 */
+const MIGRATION_KEY = "fm-radio.favoritesMigrated";
 
 /** 从 localStorage 读取收藏列表 */
 export function readFavorites(): Station[] {
@@ -31,12 +33,14 @@ export function readFavorites(): Station[] {
   }
 }
 
-/** 将收藏列表写入 localStorage */
-export function writeFavorites(stations: Station[]): void {
+/** 将收藏列表写入 localStorage。返回是否真的写进去了，迁移靠它决定要不要标记完成。 */
+export function writeFavorites(stations: Station[]): boolean {
   try {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(stations));
+    return true;
   } catch {
     // 隐私模式或容量已满，静默失败
+    return false;
   }
 }
 
@@ -57,17 +61,43 @@ export function removeFavorite(id: string): void {
   writeFavorites(filtered);
 }
 
-/** 检查是否已收藏 */
-export function isFavorite(id: string): boolean {
-  const favorites = readFavorites();
-  return favorites.some((s) => s.id === id);
+/* ---------------- 从 IndexedDB 迁移 ---------------- */
+
+export function hasLegacyMigrationRun(): boolean {
+  try {
+    return localStorage.getItem(MIGRATION_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
-/** 清空所有收藏 */
-export function clearFavorites(): void {
+export function markLegacyMigrationDone(): void {
   try {
-    localStorage.removeItem(FAVORITES_KEY);
+    localStorage.setItem(MIGRATION_KEY, "1");
   } catch {
-    // 忽略
+    // 存储不可用时不标记，下次启动还会再试一次
   }
+}
+
+/**
+ * 把 IndexedDB 时代的收藏合并进当前列表。
+ *
+ * localStorage 里已有的 id 优先——用户可能在新存储里改过收藏；旧数据按
+ * 保存时间倒序接在后面。Dexie 行上的 savedAt 不写进新存储。
+ */
+export function mergeLegacyFavorites(
+  current: Station[],
+  legacy: (Station & { savedAt?: number })[],
+): Station[] {
+  const merged = [...current];
+  const seen = new Set(current.map((s) => s.id));
+  for (const row of legacy) {
+    if (!row || typeof row.id !== "string" || typeof row.url !== "string") continue;
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    const station = { ...row };
+    delete station.savedAt;
+    merged.push(station);
+  }
+  return merged;
 }

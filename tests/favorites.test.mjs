@@ -22,7 +22,8 @@ globalThis.localStorage = {
 };
 
 const { useLibrary } = await importTs("../src/store/library.ts");
-const { readFavorites } = await importTs("../src/lib/favorites.ts");
+const { hasLegacyMigrationRun, mergeLegacyFavorites, readFavorites } =
+  await importTs("../src/lib/favorites.ts");
 
 const station = {
   id: "test-station",
@@ -85,5 +86,19 @@ test("hydrate 之后 favorites 与 favoriteIds 保持一致", async () => {
   assert.equal(state.favorites.length, 2);
   assert.equal(state.favoriteIds.size, 2);
   assert.ok(state.favoriteIds.has(station.id));
-  assert.ok(state.ready);
+  assert.equal(hasLegacyMigrationRun(), true, "迁移跑过一次后要留下标记");
+});
+
+test("迁移旧收藏：现有列表优先，旧数据去重后追加", () => {
+  const current = [{ ...station, id: "current" }];
+  const legacy = [
+    { ...station, id: "old-1", savedAt: 3 },
+    { ...station, id: "current", savedAt: 2 },
+    { id: 5, url: "https://example.com/broken.mp3" }, // 坏行：没有合法 id
+  ];
+
+  const merged = mergeLegacyFavorites(current, legacy);
+
+  assert.deepEqual(merged.map((s) => s.id), ["current", "old-1"]);
+  assert.equal("savedAt" in merged[1], false, "Dexie 的时间戳不写进 localStorage");
 });

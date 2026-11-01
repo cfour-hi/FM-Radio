@@ -1,12 +1,16 @@
 import { create } from "zustand";
 import {
   addFavorite,
-  clearFavorites,
+  hasLegacyMigrationRun,
+  markLegacyMigrationDone,
+  mergeLegacyFavorites,
   readFavorites,
   removeFavorite,
+  writeFavorites,
 } from "../lib/favorites";
 import {
   clearRecents,
+  listLegacyFavorites,
   listRecents,
   touchRecent,
 } from "../lib/db";
@@ -16,7 +20,6 @@ type LibraryState = {
   favorites: Station[];
   favoriteIds: Set<string>;
   recents: Station[];
-  ready: boolean;
   hydrate: () => Promise<void>;
   toggleFavorite: (station: Station) => void;
   isFavorite: (id: string) => boolean;
@@ -28,17 +31,26 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   favorites: [],
   favoriteIds: new Set(),
   recents: [],
-  ready: false,
 
   hydrate: async () => {
-    // 收藏从 localStorage 同步读取，最近收听从 IndexedDB 异步读取
-    const favorites = readFavorites();
+    // 收藏从 localStorage 同步读取；首次启动还要把 IndexedDB 里的旧收藏并进来
+    let favorites = readFavorites();
+    if (!hasLegacyMigrationRun()) {
+      const legacy = await listLegacyFavorites();
+      const merged = mergeLegacyFavorites(favorites, legacy);
+      /*
+       * 写不进去（隐私模式、配额满）就不标记完成，下次启动再试一次。
+       * 合并按 id 去重，重复执行没有副作用。
+       */
+      if (writeFavorites(merged)) markLegacyMigrationDone();
+      favorites = merged;
+    }
+    // 最近收听从 IndexedDB 异步读取
     const recents = await listRecents();
     set({
       favorites,
       favoriteIds: new Set(favorites.map((s) => s.id)),
       recents,
-      ready: true,
     });
   },
 
@@ -71,11 +83,5 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   forgetRecents: async () => {
     set({ recents: [] });
     await clearRecents();
-  },
-
-  /** 仅供调试使用 */
-  clearAllFavorites: () => {
-    clearFavorites();
-    set({ favorites: [], favoriteIds: new Set() });
   },
 }));

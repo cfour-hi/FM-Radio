@@ -1,12 +1,13 @@
 import Dexie, { type Table } from "dexie";
 import type { Station } from "./types";
 
-export type FavoriteRow = Station & { savedAt: number };
+/** IndexedDB 时代的收藏行，只读；新收藏已经改走 localStorage。 */
+export type LegacyFavoriteRow = Station & { savedAt: number };
 export type RecentRow = Station & { playedAt: number };
 
 /** 本地收藏 / 最近收听。全部在本地，不登录、不上传。 */
 class RadioDatabase extends Dexie {
-  favorites!: Table<FavoriteRow, string>;
+  favorites!: Table<LegacyFavoriteRow, string>;
   recents!: Table<RecentRow, string>;
 
   constructor() {
@@ -17,6 +18,11 @@ class RadioDatabase extends Dexie {
      * 声明 cache——老用户升级后旧表仍留在库里，只是没有任何代码再读写。
      */
     this.version(1).stores({ cache: "key, fetchedAt" });
+    /*
+     * favorites 表保留不动：收藏已经改存 localStorage，但这张表里还有老
+     * 用户的数据，启动时会被读出来合并一次（见 listLegacyFavorites）。
+     * 删表就等于删数据，迁移稳定之前不要动它。
+     */
     this.version(2).stores({
       favorites: "id, savedAt",
       recents: "id, playedAt",
@@ -28,33 +34,15 @@ const available = typeof indexedDB !== "undefined";
 
 export const db = available ? new RadioDatabase() : null;
 
-/* ---------------- 收藏 ---------------- */
+/* ---------------- 收藏（旧数据，只读） ---------------- */
 
-export async function listFavorites(): Promise<Station[]> {
+/** 读出 IndexedDB 时代的收藏，供启动时一次性迁到 localStorage。 */
+export async function listLegacyFavorites(): Promise<LegacyFavoriteRow[]> {
   if (!db) return [];
   try {
-    const rows = await db.favorites.orderBy("savedAt").reverse().toArray();
-    return rows;
+    return await db.favorites.orderBy("savedAt").reverse().toArray();
   } catch {
     return [];
-  }
-}
-
-export async function saveFavorite(station: Station): Promise<void> {
-  if (!db) return;
-  try {
-    await db.favorites.put({ ...station, savedAt: Date.now() });
-  } catch {
-    /* 存不下就算了，界面仍会显示这一次的收藏态 */
-  }
-}
-
-export async function dropFavorite(id: string): Promise<void> {
-  if (!db) return;
-  try {
-    await db.favorites.delete(id);
-  } catch {
-    /* 忽略 */
   }
 }
 
