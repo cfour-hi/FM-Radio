@@ -110,6 +110,14 @@ VITE_SITE_URL=https://your-domain.example
 
 留空也能正常运行，只是 `og:url` / `og:image` 会退化为相对路径。示例见 `.env.example`。
 
+如果托管站点要求 sharecode 才能访问（WorkBuddy 就是如此，裸域名和 `og.png` 都会 403），再补一行：
+
+```bash
+VITE_SHARE_QUERY=sharecode=XXXXXXXX
+```
+
+它会附加到 `og:url` / `canonical` 与 `og:image` 后面，保证爬虫能抓到页面和图片。
+
 ## 说明
 
 - 流地址由第三方提供，只收 https；部分台随时可能停播。
