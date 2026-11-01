@@ -1,10 +1,8 @@
 /*
  * radio-browser 拉取与清洗的共享工具。
  *
- * 从 build-map-data.mjs 里抽出来，供「生成地图快照」和「生成全量分片」共用。
- * 抽出来的原因：全量分片（build-stations.mjs）和老的均衡采样快照
- * 用的是同一套镜像轮换、https 硬过滤、坐标校验、离群点清洗——
- * 不抽的话这些逻辑会复制成两份，改一处漏一处。
+ * build-stations.mjs（生成快照）和 check-streams.mjs（抽查流）共用同一套
+ * 镜像轮换、https 硬过滤、坐标校验与受限并发；逻辑只留一份。
  */
 
 export const MIRRORS = [

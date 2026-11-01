@@ -12,8 +12,6 @@ import type { Station } from "./types";
 
 type Entry = { station: Station; name: string; region: string[] };
 
-// 旧接口的索引：只按台名，保持与 tests/stationSearch.test.mjs 的逐条一致
-const indexes = new WeakMap<Station[], { station: Station; name: string }[]>();
 const richIndexes = new WeakMap<Station[], Entry[]>();
 
 /** 大小写不敏感 + 去掉变音符号（é → e），否则搜 "sao" 找不到 "São" */
@@ -133,26 +131,4 @@ export function searchStations(
     hits: [...named, ...regional].slice(0, limit).map((item) => item.station),
     regionTotal,
   };
-}
-
-/* ------------------------------------------------------------------ */
-
-// 分片是不可变快照。每份数组只排序、规范化一次，旧快照释放后索引也可回收。
-export function searchByName(stations: Station[], q: string, limit = 50): Station[] {
-  const needle = q.trim().toLowerCase();
-  if (!needle || limit <= 0) return [];
-  let index = indexes.get(stations);
-  if (!index) {
-    index = stations
-      .map((station) => ({ station, name: station.name.toLowerCase() }))
-      .sort((a, b) => b.station.clicks - a.station.clicks);
-    indexes.set(stations, index);
-  }
-  const hits: Station[] = [];
-  for (const entry of index) {
-    if (!entry.name.includes(needle)) continue;
-    hits.push(entry.station);
-    if (hits.length >= limit) break;
-  }
-  return hits;
 }

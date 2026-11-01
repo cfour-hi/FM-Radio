@@ -195,5 +195,3 @@ export function loadMapCatalog(): Promise<Station[]> {
   });
   return catalogPending;
 }
-
-export { searchByName } from "./stationSearch";
