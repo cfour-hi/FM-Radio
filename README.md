@@ -70,6 +70,8 @@ pnpm data:validate    # 复查快照结构
 
 构建脚本会在写盘前检查分片结构、跨片重复和数量骤降（低于上一版 85% 直接失败）；确认数据确实变少时用 `node scripts/build-stations.mjs --force`。发布后记得提交更新过的 `data/manifest.json`，否则 CI 会按旧哈希拉取。
 
+`pnpm data:publish` 优先使用 `gh` CLI；没有安装 gh 时，设置 `GITHUB_TOKEN`（需要 contents 读写权限）会改走 GitHub REST API 上传。
+
 ## 目录
 
 ```

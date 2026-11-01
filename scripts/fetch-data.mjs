@@ -72,7 +72,31 @@ async function matches(file) {
   }
 }
 
-async function download(repo, tag, file) {
+function hasGh() {
+  try {
+    execFileSync("gh", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 私有仓库或者 CDN 拦截时，退回 gh（会读取 GH_TOKEN / 本机登录态）。 */
+async function downloadWithGh(repo, tag, file) {
+  if (!hasGh()) return false;
+  try {
+    execFileSync(
+      "gh",
+      ["release", "download", tag, "-R", repo, "-p", file.name, "-D", DATA_DIR, "--clobber"],
+      { stdio: "ignore" },
+    );
+    return await matches(file);
+  } catch {
+    return false;
+  }
+}
+
+async function downloadRaw(repo, tag, file) {
   const url = `https://github.com/${repo}/releases/download/${tag}/${file.name}`;
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -80,7 +104,12 @@ async function download(repo, tag, file) {
     redirect: "follow",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  if (!response.ok) throw new Error(`下载失败（HTTP ${response.status}）：${url}`);
+  if (!response.ok) {
+    const hint = response.status === 404
+      ? "（release/tag 或资产不存在，或仓库是私有的且未带凭据）"
+      : "";
+    throw new Error(`下载失败（HTTP ${response.status}）${hint}：${url}`);
+  }
 
   const buffer = Buffer.from(await response.arrayBuffer());
   if (buffer.length !== file.bytes || sha256(buffer) !== file.sha256) {
@@ -94,6 +123,15 @@ async function download(repo, tag, file) {
     await rename(temp, target);
   } finally {
     await rm(temp, { force: true });
+  }
+}
+
+async function download(repo, tag, file) {
+  try {
+    await downloadRaw(repo, tag, file);
+  } catch (error) {
+    if (await downloadWithGh(repo, tag, file)) return;
+    throw error;
   }
 }
 

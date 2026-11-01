@@ -27,6 +27,8 @@ jobs:
 
       # 快照现在挂在 release 上；manifest 与本地文件一致时这一步是空操作
       - run: pnpm data:pull
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm typecheck
 
@@ -53,6 +55,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm data:pull
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm exec playwright install --with-deps chromium
 
