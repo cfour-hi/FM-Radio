@@ -1,3 +1,4 @@
+import { countryNameOf } from "./countryNames";
 import type { Station } from "./types";
 
 /*
@@ -98,14 +99,15 @@ function decodeCatalogRows(rows: (string | number)[][]): Station[] {
     if (row.length < 5) continue;
     const url = text(row[4]);
     if (!url.startsWith("https://")) continue;
+    const countryCode = text(row[2]).toUpperCase();
     out.push({
       id: text(row[0]),
       name: text(row[1]),
       url,
       homepage: null,
       favicon: null,
-      countryCode: text(row[2]).toUpperCase(),
-      countryName: "",
+      countryCode,
+      countryName: countryNameOf(countryCode),
       state: null,
       languages: tokens(row[5]),
       tags: tokens(row[6]),

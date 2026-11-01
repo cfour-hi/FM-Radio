@@ -1,4 +1,5 @@
 import { regionLabel } from "./cnEnrichment";
+import { countryNameOf } from "./countryNames";
 import type { Station } from "./types";
 
 /*
@@ -17,40 +18,6 @@ const richIndexes = new WeakMap<Station[], Entry[]>();
 /** 大小写不敏感 + 去掉变音符号（é → e），否则搜 "sao" 找不到 "São" */
 export const fold = (value: string): string =>
   value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
-
-/**
- * 国家代码 → 中文国名。
- *
- * 用 Intl.DisplayNames 而不是维护一张几十条的中英对照表：语言包跟着浏览器
- * 走，永远不会漏国家，也不会写错。运行环境不支持时返回空串，搜索退化为
- * 英文国名与国家代码。
- *
- * 港澳台不走 Intl：语言包给的是「中国香港特别行政区」「台湾」这类写法，
- * 既啰嗦又不合规范。这三地的中文名由 regionLabel 统一给出，和数据里的
- * 省名是同一套。
- */
-const CN_SPECIAL: Record<string, string> = { HK: "香港", MO: "澳门", TW: "台湾" };
-
-let displayNames: Intl.DisplayNames | null | undefined;
-function countryNameOf(code: string): string {
-  if (!/^[A-Za-z]{2}$/.test(code)) return "";
-  const special = CN_SPECIAL[code.toUpperCase()];
-  if (special) return regionLabel(special);
-  if (displayNames === undefined) {
-    try {
-      displayNames = new Intl.DisplayNames(["zh-CN"], { type: "region" });
-    } catch {
-      displayNames = null;
-    }
-  }
-  try {
-    const name = displayNames?.of(code.toUpperCase());
-    // 未知代码会原样返回代码本身，那不算国名
-    return name && name.toUpperCase() !== code.toUpperCase() ? name : "";
-  } catch {
-    return "";
-  }
-}
 
 function regionTokens(station: Station): string[] {
   const tokens: (string | null | undefined)[] = [
