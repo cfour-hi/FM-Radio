@@ -22,7 +22,7 @@ export default function PlayerTitleRow({
   return (
     <>
       {/* 标题行：台名放大到 16px、可换行；移动端单行截断。点台名飞回它在地球上的位置 */}
-      <div className="flex items-start gap-1.5 sm:px-3.5 sm:pt-3">
+      <div className="flex items-center gap-1.5 sm:px-3.5 sm:pt-3">
         <button
           type="button"
           onClick={onLocate}
@@ -45,7 +45,7 @@ export default function PlayerTitleRow({
           aria-label="收起播放器"
           aria-expanded={true}
           aria-controls="player-body"
-          className="-mt-2 h-11 shrink-0 px-2 text-[12px] text-muted sm:hidden"
+          className="h-11 shrink-0 px-2 text-[12px] text-muted sm:hidden"
         >
           收起
         </button>

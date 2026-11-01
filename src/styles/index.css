@@ -211,9 +211,9 @@
   }
 
   @media (max-width: 639.98px) {
-    /* 手机品牌与工具栏共用顶部 56px，面板在其下方留 12px 间距。 */
+    /* 手机品牌与工具栏共用顶部 56px，面板在其下方留 12px 间距；刘海屏再让出状态栏。 */
     .drawer {
-      top: 68px;
+      top: calc(env(safe-area-inset-top, 0px) + 68px);
     }
 
     /*
@@ -488,6 +488,22 @@
     .tuning-ring {
       border-top-color: var(--color-signal);
     }
+  }
+}
+
+/*
+ * 顶部浮层让开状态栏 / 灵动岛。
+ *
+ * index.html 用了 viewport-fit=cover，页面会铺到安全区里；Header、右上按钮、
+ * HUD 角标如果写死 top-3，在刘海屏上会压在状态栏下面。
+ */
+.top-safe {
+  top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+}
+
+@media (min-width: 640px) {
+  .top-safe {
+    top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
   }
 }
 

@@ -41,14 +41,12 @@ export default function PlayerBar() {
   const queue = usePlayer((s) => s.queue);
   const toggle = usePlayer((s) => s.toggle);
   const next = usePlayer((s) => s.next);
-  const previous = usePlayer((s) => s.previous);
   const retry = usePlayer((s) => s.retry);
   const errorAlternative = usePlayer((s) => s.errorAlternative);
   const focusStation = useMapStore((s) => s.focusStation);
 
   const playing = status === "playing" || status === "tuning" || status === "buffering";
   const erroring = status === "error";
-  const hasPrevious = usePlayer((s) => s.history.length > 0);
 
   /*
    * 有没有可替换的台。
@@ -270,10 +268,8 @@ export default function PlayerBar() {
           playing={playing}
           erroring={erroring}
           failedForAutoplay={failedForAutoplay}
-          hasPrevious={hasPrevious}
           onToggle={toggle}
           onNext={() => next(1)}
-          onPrevious={() => previous()}
         />
       </div>
 

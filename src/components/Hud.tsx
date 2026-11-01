@@ -18,6 +18,7 @@ type Props = {
  * （见 PlayerBar 里的说明），所以桌面布局一个像素都不动。
  */
 const BOTTOM_CORNER = { bottom: "calc(var(--player-bar-h, 0px) + 12px)" } as const;
+const TOP_CORNER = { top: "calc(env(safe-area-inset-top, 0px) + 12px)" } as const;
 
 /*
  * 地图 HUD：四角 L 形角标 + 底部经纬度读数。
@@ -30,8 +31,8 @@ export default function Hud({ view, total, fxName }: Props) {
   return (
     <>
       {/* 四角 L 形角标 */}
-      <div aria-hidden data-hud-corner="tl" className="pointer-events-none absolute left-3 top-3 z-20 h-4 w-4 border-l border-t border-cold/50" />
-      <div aria-hidden data-hud-corner="tr" className="pointer-events-none absolute right-3 top-3 z-20 h-4 w-4 border-r border-t border-cold/50" />
+      <div aria-hidden data-hud-corner="tl" style={TOP_CORNER} className="pointer-events-none absolute left-3 z-20 h-4 w-4 border-l border-t border-cold/50" />
+      <div aria-hidden data-hud-corner="tr" style={TOP_CORNER} className="pointer-events-none absolute right-3 z-20 h-4 w-4 border-r border-t border-cold/50" />
       <div aria-hidden data-hud-corner="bl" style={BOTTOM_CORNER} className="pointer-events-none absolute left-3 z-20 h-4 w-4 border-b border-l border-cold/50" />
       <div aria-hidden data-hud-corner="br" style={BOTTOM_CORNER} className="pointer-events-none absolute right-3 z-20 h-4 w-4 border-b border-r border-cold/50" />
 
@@ -45,7 +46,7 @@ export default function Hud({ view, total, fxName }: Props) {
        * 窄屏放不下（logo 和按钮已经占满顶部），索性隐掉：移动端也不靠
        * 经纬度读数判断什么。
        */}
-      <div className="pointer-events-none absolute left-1/2 top-5 z-20 hidden -translate-x-1/2 sm:block">
+      <div className="pointer-events-none absolute left-1/2 top-safe z-20 hidden -translate-x-1/2 sm:block">
         <p className="num whitespace-nowrap text-[10px] uppercase tracking-[0.16em] text-dim">
           {fxName ? (
             <>

@@ -412,7 +412,7 @@ export default function MapPage() {
        * 按钮组顶边与左上角 Header 胶囊对齐（sm:top-6 / 移动端 top-4），
        * 和中间的 HUD 读数组成一条齐平的顶部仪表带。
        */}
-      <div className="pointer-events-none absolute right-2 top-3 z-20 flex items-center gap-1 sm:gap-1.5 sm:right-5 sm:top-6">
+      <div className="pointer-events-none absolute right-3 top-safe z-20 flex items-center gap-1 sm:gap-1.5 sm:right-6">
         {/* 电台面板：右侧抽屉 */}
         <button
           type="button"

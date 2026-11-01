@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: EngineStatus }) {
   return (
     <span
       className={cn(
-        "num mt-px shrink-0 rounded-[3px] border px-1.5 py-px text-[9px] uppercase tracking-[0.16em]",
+        "num shrink-0 rounded-[3px] border px-1.5 py-px text-[9px] uppercase tracking-[0.16em]",
         tone,
       )}
     >

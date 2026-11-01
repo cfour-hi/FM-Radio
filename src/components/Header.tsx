@@ -15,8 +15,11 @@ import { usePlayer } from "../store/player";
  * 「回到世界」的触发（左键点一下让镜头飞回全球视角），右边的信号点和
  * On Air / Standby 说明当前是否在出声。
  *
- * 胶囊现在是两行结构：第一行是品牌（信号点 + 中文应用名「地球之声」+
- * 小号英文副标 FM Radio + 出声状态），第二行是 slogan，左对齐于应用名。
+ * 桌面上胶囊是两行：第一行是品牌（信号点 + 中文应用名「地球之声」+
+ * 小号英文副标 FM Radio + 出声状态），第二行是 slogan。
+ *
+ * 手机上只留品牌行：右上角那排按钮是 44px，胶囊再挂一行 slogan 会比它们
+ * 高出一截，顶部一横排就对不齐；抽屉的 68px 起始位置也是按 56px 的头算的。
  */
 
 export default function Header() {
@@ -24,7 +27,7 @@ export default function Header() {
   const flyHome = useMapStore((s) => s.flyHome);
 
   return (
-    <header className="pointer-events-none fixed left-2 top-3 z-30 sm:left-6 sm:top-6">
+    <header className="pointer-events-none fixed left-3 top-safe z-30 sm:left-6">
       <div className="pointer-events-auto flex flex-col gap-1 rounded-[8px] border border-line/70 bg-base/55 px-2 py-2 sm:px-3 sm:py-2.5 backdrop-blur-md">
         {/* 品牌行：信号点 + 应用名 + 英文副标 + 出声状态 */}
         <div className="flex items-center gap-2">
@@ -57,8 +60,8 @@ export default function Header() {
           </span>
         </div>
 
-        {/* slogan 行 */}
-        <div className="flex items-center gap-2">
+        {/* slogan 行：只在桌面出现 */}
+        <div className="hidden items-center gap-2 sm:flex">
           <span aria-hidden className="hidden h-1.5 w-1.5 opacity-0 sm:block" />
           <span className="whitespace-nowrap text-[12px] tracking-[0.08em] text-muted">
             {SLOGAN}
