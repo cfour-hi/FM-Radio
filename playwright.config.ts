@@ -21,7 +21,12 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "pnpm dev --port 5566 --strictPort",
+    /*
+     * 必须显式绑定 127.0.0.1：Vite 默认的 localhost 在某些环境（包括
+     * GitHub Actions 的 Node）只解析到 ::1，而这里探测的是 127.0.0.1，
+     * 结果是浏览器永远等不到 dev server，CI 报 webServer 超时。
+     */
+    command: "pnpm exec vite --host 127.0.0.1 --port 5566 --strictPort",
     url: "http://127.0.0.1:5566",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
