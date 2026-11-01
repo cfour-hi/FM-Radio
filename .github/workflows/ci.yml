@@ -15,6 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # 快照按 manifest 哈希缓存；命中后 data:pull 只做本地校验
+      - uses: actions/cache@v6
+        with:
+          path: src/data
+          key: fm-data-v1-${{ hashFiles('data/manifest.json') }}
+
       # 版本从 package.json 的 packageManager 字段读
       - uses: pnpm/action-setup@v6
 
@@ -32,7 +38,7 @@ jobs:
 
       - run: pnpm typecheck
 
-      # 不联网：只校验仓库里已提交的三份快照结构
+      # 不联网：只校验本地三份快照的结构
       - run: pnpm data:validate
 
       - run: pnpm test
@@ -44,6 +50,11 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: src/data
+          key: fm-data-v1-${{ hashFiles('data/manifest.json') }}
 
       - uses: pnpm/action-setup@v6
 
