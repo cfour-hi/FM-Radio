@@ -96,3 +96,22 @@ test("抽屉：可以打开和关闭", async ({ page }) => {
   await drawer.getByRole("button", { name: "收起面板" }).click();
   await expect(drawer).toBeHidden();
 });
+
+test("抽屉：键盘焦点留在面板内，关闭后归还触发按钮", async ({ page }) => {
+  await openApp(page);
+  const trigger = page.getByRole("button", { name: "电台面板" });
+  await trigger.focus();
+  await trigger.click();
+
+  const drawer = page.getByRole("dialog", { name: "电台面板" });
+  await expect(drawer).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+  // 面板里只有十来个可聚焦元素，按两轮 Tab 一定会回绕
+  for (let i = 0; i < 15; i++) await page.keyboard.press("Tab");
+  expect(await drawer.evaluate((root) => root.contains(document.activeElement))).toBe(true);
+
+  await drawer.getByRole("button", { name: "收起面板" }).click();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+});

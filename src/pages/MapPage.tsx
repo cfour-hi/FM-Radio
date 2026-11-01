@@ -417,7 +417,8 @@ export default function MapPage() {
         <button
           type="button"
           onClick={() => setDrawerOpen((v) => !v)}
-          aria-pressed={drawerOpen}
+          aria-expanded={drawerOpen}
+          aria-controls="station-drawer"
           aria-label="电台面板"
           title="电台面板"
           className={`${ICON_BUTTON} ${

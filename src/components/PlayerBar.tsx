@@ -550,6 +550,28 @@ export default function PlayerBar() {
     );
   }
 
+  /*
+   * 读屏播报。
+   *
+   * 状态徽章是一块只有视觉的英文小字，读屏用户不会主动去读；连接中、
+   * 已暂停、尤其是「播放失败」这些变化必须能在不移动焦点的情况下听到。
+   * 文案只在状态变化时变，aria-live 不会重复朗读。
+   */
+  const liveMessage =
+    status === "tuning"
+      ? `正在连接 ${station.name}`
+      : status === "buffering"
+        ? `正在缓冲 ${station.name}`
+        : status === "playing"
+          ? `正在播放 ${station.name}`
+          : status === "paused"
+            ? `已暂停 ${station.name}`
+            : status === "error"
+              ? failedForAutoplay
+                ? "浏览器拦截了播放，点击播放键开始收听"
+                : `${station.name} 播放失败：${error ?? "未知原因"}`
+              : "";
+
   const meta = [
     flagOf(station.countryCode),
     ...stationMeta(station),
@@ -592,6 +614,9 @@ export default function PlayerBar() {
         "sm:inset-x-auto sm:bottom-6 sm:left-6 sm:z-30 sm:w-fit sm:max-w-[min(380px,calc(100vw-3rem))] sm:rounded-[12px] sm:border sm:bg-base-2/85 sm:backdrop-blur-sm sm:shadow-2xl",
       )}
     >
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {liveMessage}
+      </p>
       {collapsed && (
         <div className="mini-player absolute inset-x-0 top-0 flex h-14 items-center gap-2 px-3 sm:hidden">
           <button type="button" onClick={() => setCollapsed(false)} aria-label="展开播放器" aria-expanded={false} aria-controls="player-body" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left">

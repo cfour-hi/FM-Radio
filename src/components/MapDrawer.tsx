@@ -10,6 +10,7 @@ import type { Station } from "../lib/types";
 import { useLibrary } from "../store/library";
 import { usePlayer } from "../store/player";
 import { useDragGesture } from "../hooks/useDragGesture";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useIsCompact } from "../hooks/useIsCompact";
 import { usePresence } from "../hooks/usePresence";
 import { isPresent } from "../lib/presence";
@@ -221,6 +222,8 @@ function DrawerContent({
   const compact = useIsCompact();
   const [dragging, setDragging] = useState(false);
   const dragRoot = useRef<HTMLDivElement>(null);
+  // 打开时把键盘焦点留在面板里，关闭时还给打开它的按钮
+  useFocusTrap(dragRoot, open);
   const drag = useDragGesture({
     enabled: open && compact,
     axis: "x",
@@ -239,6 +242,9 @@ function DrawerContent({
 
   const rootProps = {
     ref: dragRoot,
+    id: "station-drawer",
+    tabIndex: -1,
+    "aria-modal": "true",
     "data-state": phase,
     "data-dragging": dragging ? "true" : undefined,
     onPointerDown: drag.onPointerDown,
