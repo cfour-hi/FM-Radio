@@ -6,7 +6,7 @@
 
 纯前端单页应用，没有后端与账号体系。内容只有一颗可以拖动的地球和它上面的电台光点；所有数据要么来自构建期生成的快照，要么保存在本机。
 
-技术栈：React 19、Vite、TypeScript（strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`）、Zustand、MapLibre GL（globe 投影）、hls.js、Tailwind CSS 4、Dexie（仅最近收听）。
+技术栈：React 19、Vite、TypeScript（strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`）、Zustand、MapLibre GL（globe 投影）、hls.js、Tailwind CSS 4。
 
 ## 2. 运行时结构
 
@@ -37,9 +37,9 @@ main.tsx
 
 存储分工：
 
-- **localStorage**：收藏与迁移标记、音量 / 静音、上次收听的电台快照、新手引导、特效选择。写失败（隐私模式）一律静默降级。
+- **localStorage**：收藏、最近收听（30 条）与各自的迁移标记、音量 / 静音、上次收听的电台快照、新手引导、特效选择。写失败（隐私模式）一律静默降级。
 - **sessionStorage**：睡眠定时截止时间、手动选择的地区；新会话不继承。
-- **IndexedDB（Dexie，库名 `fm-radio`）**：最近收听 30 条；旧版收藏表只读保留，启动时一次性合并进 localStorage（按 id 去重，写成功后才写迁移标记）。
+- **旧 IndexedDB（库名 `fm-radio`）**：早期版本的收藏与最近收听。启动时用原生 API 一次性读出来合并进 localStorage（按 id 去重，写成功后才写迁移标记），之后不再读写；应用不再依赖 Dexie。
 
 浏览器定位的坐标只存在 React 内存里，不反查省市、不上传、不持久化。
 

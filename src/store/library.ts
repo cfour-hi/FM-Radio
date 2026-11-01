@@ -10,10 +10,14 @@ import {
 } from "../lib/favorites";
 import {
   clearRecents,
-  listLegacyFavorites,
-  listRecents,
-  touchRecent,
-} from "../lib/db";
+  hasRecentsMigrationRun,
+  markRecentsMigrationDone,
+  mergeLegacyRecents,
+  readRecents,
+  RECENTS_LIMIT,
+  writeRecents,
+} from "../lib/recents";
+import { readLegacyFavorites, readLegacyRecents } from "../lib/legacyDb";
 import type { Station } from "../lib/types";
 
 type LibraryState = {
@@ -23,8 +27,8 @@ type LibraryState = {
   hydrate: () => Promise<void>;
   toggleFavorite: (station: Station) => void;
   isFavorite: (id: string) => boolean;
-  remember: (station: Station) => Promise<void>;
-  forgetRecents: () => Promise<void>;
+  remember: (station: Station) => void;
+  forgetRecents: () => void;
 };
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -36,8 +40,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     // 收藏从 localStorage 同步读取；首次启动还要把 IndexedDB 里的旧收藏并进来
     let favorites = readFavorites();
     if (!hasLegacyMigrationRun()) {
-      const legacy = await listLegacyFavorites();
-      const merged = mergeLegacyFavorites(favorites, legacy);
+      const merged = mergeLegacyFavorites(favorites, await readLegacyFavorites());
       /*
        * 写不进去（隐私模式、配额满）就不标记完成，下次启动再试一次。
        * 合并按 id 去重，重复执行没有副作用。
@@ -45,8 +48,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       if (writeFavorites(merged)) markLegacyMigrationDone();
       favorites = merged;
     }
-    // 最近收听从 IndexedDB 异步读取
-    const recents = await listRecents();
+
+    // 最近收听同样迁到 localStorage；旧库只在第一次启动时读一次
+    let recents = readRecents();
+    if (!hasRecentsMigrationRun()) {
+      const merged = mergeLegacyRecents(recents, await readLegacyRecents());
+      if (writeRecents(merged)) markRecentsMigrationDone();
+      recents = merged;
+    }
+
     set({
       favorites,
       favoriteIds: new Set(favorites.map((s) => s.id)),
@@ -74,14 +84,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   isFavorite: (id) => get().favoriteIds.has(id),
 
-  remember: async (station) => {
-    const rest = get().recents.filter((s) => s.id !== station.id);
-    set({ recents: [station, ...rest].slice(0, 30) });
-    await touchRecent(station);
+  remember: (station) => {
+    const next = [station, ...get().recents.filter((s) => s.id !== station.id)]
+      .slice(0, RECENTS_LIMIT);
+    set({ recents: next });
+    writeRecents(next);
   },
 
-  forgetRecents: async () => {
+  forgetRecents: () => {
     set({ recents: [] });
-    await clearRecents();
+    clearRecents();
   },
 }));

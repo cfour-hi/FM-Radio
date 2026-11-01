@@ -10,7 +10,7 @@ export const ROW_HEIGHT = 60;
 
 /*
  * flagOf / stationMeta 原先定义在这里。为了让地图的悬停提示条能复用它们、
- * 又不把 player store 和 Dexie 一起拖进地图的 lazy chunk，实体搬去了
+ * 又不把 player store 和本地存储一起拖进地图的 lazy chunk，实体搬去了
  * lib/stationMeta。这里保留同名导出，老的 import 不用改。
  */
 export { flagOf, stationMeta };

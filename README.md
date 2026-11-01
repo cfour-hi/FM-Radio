@@ -12,7 +12,7 @@
 
 ## 技术栈
 
-React 19 · Vite · TypeScript · Zustand · MapLibre GL · hls.js · Tailwind CSS 4 · Dexie
+React 19 · Vite · TypeScript · Zustand · MapLibre GL · hls.js · Tailwind CSS 4
 
 ## 快速开始
 

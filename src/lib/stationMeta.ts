@@ -6,7 +6,7 @@ import type { Station } from "./types";
  *
  * 抽成独立模块是为了让地图层能单独用它——`hoverTooltip` 需要台名、国旗和
  * 归属，但它不该因此把 `StationRow` 拖进来，那个文件背后连着 player store
- * 和 Dexie，会白白扩大地图的 lazy chunk。
+ * 和本地存储，会白白扩大地图的 lazy chunk。
  */
 
 /** 把国家代码转成旗帜；非两位字母就原样返回 */
