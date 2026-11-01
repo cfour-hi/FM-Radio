@@ -21,6 +21,8 @@ const WEAK_SIGNAL_DELAY = 4000;
 /** 已经出过声又卡住：8 秒给个「可以换台」的提示，15 秒认输 */
 const BUFFER_HINT_DELAY = 8000;
 const BUFFER_TIMEOUT = 15000;
+/** 暂停超过这么久再继续，重新连接回到直播边缘，而不是从旧缓冲接着播 */
+const STALE_RESUME_MS = 30_000;
 
 class PlayerEngine {
   private audio: HTMLAudioElement | null = null;
@@ -32,6 +34,13 @@ class PlayerEngine {
   /** 本次 buffering 从什么时候开始，给「已缓冲 N 秒」提示做基准 */
   private bufferingSince: number | null = null;
   private pausedAt: number | null = null;
+  /**
+   * 用户在加载期间按了暂停。
+   *
+   * hls.js 是动态 import 的，audio 元素要等它下载完才创建；这段时间里
+   * pause() 找不到元素。把意图记下来，manifest 到达时先看它，别自顾自开播。
+   */
+  private pauseRequested = false;
   private status: EngineStatus = "idle";
   private volume = 1;
   private muted = false;
@@ -41,6 +50,8 @@ class PlayerEngine {
   private station: Station | null = null;
   private usedHlsJs = false;
   private fallbackUsed = false;
+  /** hls.js 解析到 manifest 之前，play() 没有意义 */
+  private manifestReady = false;
 
   hooks: EngineHooks | null = null;
 
@@ -60,6 +71,8 @@ class PlayerEngine {
     const token = ++this.loadToken;
     this.startedAt = Date.now();
     this.pausedAt = null;
+    this.pauseRequested = false;
+    this.manifestReady = false;
     // setStatus 进 tuning 时会挂上连接超时，这里不再单独 arm
     this.setStatus("tuning", null);
 
@@ -86,12 +99,28 @@ class PlayerEngine {
     if (!isHlsStream(station)) return false;
 
     this.fallbackUsed = true;
+    const paused = this.pauseRequested;
     this.load(station, true);
     this.fallbackUsed = true; // load 会重置，这里要重新标上
+    this.pauseRequested = paused; // 回退不能把用户按过的暂停抹掉
     return true;
   }
 
   resume(): void {
+    this.pauseRequested = false;
+    const pausedFor = this.pausedAt === null ? 0 : Date.now() - this.pausedAt;
+
+    /*
+     * 直播流暂停久了，元素里留着的是几十秒前的缓冲。直接 play() 会从那里
+     * 接着播，用户听到的是「过去」；重新连接一次才能回到直播边缘。
+     * audio 还不存在（hls.js 仍在下载）时也走这条路：重新装载最省事。
+     */
+    const hlsStillLoading = this.hls !== null && !this.manifestReady;
+    if (this.station && (!this.audio || hlsStillLoading || pausedFor >= STALE_RESUME_MS)) {
+      this.load(this.station);
+      return;
+    }
+
     const el = this.audio;
     if (!el) return;
     /*
@@ -110,11 +139,14 @@ class PlayerEngine {
   }
 
   pause(): void {
+    // 空闲时媒体会话也可能发 pause，没有台就别把状态改成「暂停」
+    if (!this.station) return;
     this.clearConnectTimer();
     this.clearBufferTimer();
-    if (!this.audio) return;
-    this.audio.pause();
+    this.pauseRequested = true;
     this.pausedAt = Date.now();
+    // audio 可能还没创建（hls.js 正在下载）；状态先切到暂停，别让界面继续转圈
+    this.audio?.pause();
     this.setStatus("paused", null);
   }
 
@@ -122,6 +154,8 @@ class PlayerEngine {
     ++this.loadToken; // 也取消尚在等待 hls.js 下载的加载请求
     this.disposeSource();
     this.station = null;
+    this.pauseRequested = false;
+    this.manifestReady = false;
     this.stopTicker();
     this.setStatus("idle", null);
   }
@@ -147,6 +181,12 @@ class PlayerEngine {
 
     el.addEventListener("playing", () => {
       if (!mine()) return;
+      // 迟到的 playing 事件不能盖过用户刚按下的暂停
+      if (this.pauseRequested) {
+        el.pause();
+        this.setStatus("paused", null);
+        return;
+      }
       this.clearConnectTimer();
       this.clearBufferTimer();
       this.pausedAt = null;
@@ -231,6 +271,12 @@ class PlayerEngine {
 
     hls.on(HlsLib.Events.MANIFEST_PARSED, () => {
       if (!mine()) return;
+      this.manifestReady = true;
+      // 下载解码器期间用户可能已经按了暂停，这时只把状态收好，不要出声
+      if (this.pauseRequested) {
+        this.setStatus("paused", null);
+        return;
+      }
       void this.safePlay(el);
     });
 

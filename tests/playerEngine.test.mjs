@@ -164,6 +164,38 @@ test("暂停后恢复重新计时；换台后重新计时且忽略旧音频事�
   assert.equal(env.timers.size, 0);
 });
 
+test("暂停超过 30 秒再继续，重新连接而不是播旧缓冲", (t) => {
+  const env = setup(t);
+  engine.load(station);
+  env.advance(1000);
+  env.audios[0].dispatchEvent(new Event("playing"));
+
+  engine.pause();
+  env.advance(30_000);
+  engine.resume();
+
+  assert.equal(env.audios.length, 2, "应该新建一个 Audio 重新连接");
+  assert.equal(engine.currentStatus, "tuning");
+});
+
+test("暂停后迟到的 playing 事件不会把状态改回播放", (t) => {
+  const env = setup(t);
+  engine.load(station);
+  env.advance(1000);
+  engine.pause();
+
+  env.audios[0].dispatchEvent(new Event("playing"));
+
+  assert.equal(engine.currentStatus, "paused");
+});
+
+test("空闲时暂停不会把状态改成 paused", (t) => {
+  setup(t);
+  engine.stop();
+  engine.pause();
+  assert.equal(engine.currentStatus, "idle");
+});
+
 test("waiting 反复触发不会把连接超时往后推", (t) => {
   const env = setup(t);
   engine.load(station);
