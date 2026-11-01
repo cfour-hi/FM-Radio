@@ -75,7 +75,9 @@ pnpm dev
 pnpm data:pull
 ```
 
-周更流程：
+每周一由 [`.github/workflows/weekly-data.yml`](.github/workflows/weekly-data.yml) 自动完成：拉取全量 → 校验 → typecheck / test / build / e2e → 发布新 release → 提交 manifest。失败时 job 变红，不会产出半份数据。
+
+需要本机手动更新时（首次或排查问题）：
 
 ```bash
 pnpm data:release     # 拉全量 + 校验 + 构建；失败不会写入任何文件
@@ -85,6 +87,8 @@ pnpm data:validate    # 复查快照结构
 ```
 
 构建脚本会在写盘前检查分片结构、跨片重复和数量骤降（低于上一版 85% 直接失败）；确认数据确实变少时用 `node scripts/build-stations.mjs --force`。发布后记得提交更新过的 `data/manifest.json`，否则 CI 会按旧哈希拉取。
+
+页面部署仍在 WorkBuddy 手动完成：自动刷新跑完后，本地 `git pull && pnpm build`，再用新的 `dist` 发布。
 
 `pnpm data:publish` 优先使用 `gh` CLI；没有安装 gh 时，设置 `GITHUB_TOKEN`（需要 contents 读写权限）会改走 GitHub REST API 上传。
 

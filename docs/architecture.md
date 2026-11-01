@@ -109,6 +109,7 @@ main.tsx
 - `pnpm typecheck`：严格 TS。
 - `pnpm e2e`：Playwright 冒烟，覆盖首屏、搜索、点台、深链、抽屉开关与焦点陷阱。
 - `.github/workflows/ci.yml`：`data:pull` → `typecheck` → `data:validate` → `test` → `build`，之后单独跑 e2e。
+- `.github/workflows/weekly-data.yml`：每周一自动拉取 radio-browser、校验、typecheck / test / build、发布 release 并提交 manifest；页面部署仍在 WorkBuddy 手动完成。
 
 ## 10. 已知限制
 

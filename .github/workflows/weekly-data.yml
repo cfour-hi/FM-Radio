@@ -1,0 +1,78 @@
+name: Weekly data
+
+on:
+  schedule:
+    # 每周一 03:17 UTC（北京时间 11:17），避开整点调度高峰
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 拉全量、翻页失败即停、数量骤降拒绝写盘
+      - name: 重建电台快照
+        run: node scripts/build-stations.mjs
+
+      - run: pnpm data:validate
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      # 先确认新数据能构建，再创建 release，避免发出构建不了的版本
+      - run: pnpm build
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # 数据变了但代码没变，普通 CI 不会被 bot 提交触发；这里补上 e2e
+      - run: pnpm e2e
+
+      # 抽查只作报告：runner 的网络位置可能误判 geo-block，不阻塞发布
+      - name: 抽查热门流
+        run: node scripts/check-streams.mjs --limit=100
+        continue-on-error: true
+
+      - name: 发布数据 release 并更新 manifest
+        run: pnpm data:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 默认 token 的 push 不会再触发 on: push 的 CI；
+      # 这里已经跑过 typecheck、test、build 与 e2e，闭环仍然完整。
+      - name: 提交 manifest
+        run: |
+          if git diff --quiet -- data/manifest.json; then
+            echo "manifest 无变化，跳过提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/manifest.json
+          git commit -m "更新电台数据 $(date -u +%F)"
+          git push origin HEAD:main
