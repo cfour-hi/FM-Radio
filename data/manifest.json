@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "tag": "data-2026-11-01-7dbc4b21",
+  "generatedAt": "2026-11-01",
+  "counts": {
+    "core": 2305,
+    "rest": 7886,
+    "catalog": 22665
+  },
+  "files": [
+    {
+      "name": "stations-core.json",
+      "bytes": 600911,
+      "sha256": "389b1699673e4c9172aff7f0fef628fa1f4a7b48fa9ecb91676ba694bf0c585e"
+    },
+    {
+      "name": "stations-rest.json",
+      "bytes": 2281378,
+      "sha256": "f89fd457abf621fd0f2055618f0df4ee5bba8ed0501c3e10ab507fdf58b9d181"
+    },
+    {
+      "name": "stations-catalog.json",
+      "bytes": 3587927,
+      "sha256": "211d86e2844bf17f2143f431fc3266dfde2bda0dbab0f2d9acb08de8a040f062"
+    }
+  ]
+}

@@ -71,9 +71,9 @@ main.tsx
 
 | 分片 | 数量（当前） | 体积（gzip） | 加载时机 |
 | --- | --- | --- | --- |
-| core | 2,216 | 196KB | 首屏，地图渲染前 |
-| rest | 7,473 | 756KB | 地图就绪后 `requestIdleCallback` |
-| catalog | 21,409 | 1.45MB | 搜索词 ≥2 字或开始筛选 |
+| core | 2,305 | 197KB | 首屏，地图渲染前 |
+| rest | 7,886 | 763KB | 地图就绪后 `requestIdleCallback` |
+| catalog | 22,665 | 1.46MB | 搜索词 ≥2 字或开始筛选 |
 
 中国台由 `scripts/cn-geo.mjs` 按台名推断到城市 / 省，坐标带确定性抖动并标记 `geoApprox`；境外台做离群点清洗。
 
@@ -84,7 +84,7 @@ main.tsx
 - 逐条检查 id / 台名 / https / 坐标，跨分片查重复 id；
 - 与上一版对比，任一比分片掉超过 15% 判失败（确认无误用 `--force`）。
 
-`pnpm data:validate` 在 CI 里复查已提交快照；`pnpm data:check` 抽查热门流，不放进 CI。
+快照不再写进 git 历史，而是发布成 GitHub Release；仓库只跟踪 `data/manifest.json`（tag、大小、sha256）。`scripts/fetch-data.mjs` 按清单拉取并逐个校验，`scripts/publish-data.mjs` 负责创建 release 与更新清单。CI 里先 `pnpm data:pull`，再跑 `data:validate`；`data:check` 抽查热门流，不放进 CI。
 
 ## 7. 搜索与发现
 
@@ -97,7 +97,7 @@ main.tsx
 
 ## 8. 性能
 
-- 首屏 JS 约 570KB gzip（index 149 + WorldMap 283 + worker 144）；core 数据 196KB gzip。
+- 首屏 JS 约 560KB gzip（index 124 + WorldMap 293 + worker 144）；core 数据 197KB gzip。
 - 地图、特效、hls.js、catalog 全部按需加载。
 - 星空背景用 Canvas 静态绘制，替代 300 层 CSS radial-gradient；对比测量见 git 历史（原渐变平均帧间隔 45ms，Canvas 约 21ms，1280×720）。
 - 抽屉首次打开前不挂载内容，首次打开也不请求定位。
@@ -105,14 +105,14 @@ main.tsx
 
 ## 9. 测试与 CI
 
-- `pnpm test`：109 个 Node 测试，覆盖搜索、手势、睡眠定时、定位、播放状态机（含 HLS 替身）、收藏迁移、快照校验等纯逻辑。
+- `pnpm test`：118 个 Node 测试，覆盖搜索、手势、睡眠定时、定位、播放状态机（含 HLS 替身）、收藏与最近收听迁移、国家名、快照校验等纯逻辑。
 - `pnpm typecheck`：严格 TS。
-- `.github/workflows/ci.yml`：`typecheck` → `data:validate` → `test` → `build`。
-- 没有组件测试与端到端测试；关键交互目前靠浏览器人工验证。
+- `pnpm e2e`：Playwright 冒烟，覆盖首屏、搜索、点台、深链、抽屉开关与焦点陷阱。
+- `.github/workflows/ci.yml`：`data:pull` → `typecheck` → `data:validate` → `test` → `build`，之后单独跑 e2e。
 
 ## 10. 已知限制
 
 - 电台流由第三方提供，停播是周级别的事；`data:check` 只抽查热门流。
-- 快照随仓库提交，周更会产生约 5.8MB 的新数据版本。
+- 快照已改为发布到 GitHub Release（见第 6 节）；迁移完成前 git 里仍保留当前版本。构建从此依赖 GitHub 可用性。
 - 移动端真机（软键盘、锁屏、后台播放）未全面验收。
 - `probe/` 下的浏览器检查页被 gitignore，文档不再引用它们；需要复现时请从本地保留的副本取用。

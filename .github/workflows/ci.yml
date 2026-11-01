@@ -25,6 +25,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # 快照现在挂在 release 上；manifest 与本地文件一致时这一步是空操作
+      - run: pnpm data:pull
+
       - run: pnpm typecheck
 
       # 不联网：只校验仓库里已提交的三份快照结构
@@ -48,6 +51,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm data:pull
 
       - run: pnpm exec playwright install --with-deps chromium
 

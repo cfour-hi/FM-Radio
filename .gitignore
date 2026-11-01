@@ -23,3 +23,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# 电台快照从 GitHub Release 拉取；清单 data/manifest.json 仍跟踪。
+# 迁移期间这三份文件暂时还在版本库里，执行 git rm --cached 后这条才生效。
+src/data/stations-*.json

@@ -34,9 +34,11 @@ pnpm dev
 | `pnpm preview` | 预览构建产物 |
 | `pnpm typecheck` | 只跑 TypeScript |
 | `pnpm test` | Node 测试（纯逻辑，不联网） |
-| `pnpm e2e` | Playwright 冒烟（需先安装 `@playwright/test`，见下） |
+| `pnpm e2e` | Playwright 冒烟（首次需安装 Chromium，见下） |
+| `pnpm data:pull` | 按 manifest 拉取并校验电台快照 |
 | `pnpm data:release` | 拉取 radio-browser 全量并重建快照，然后构建 |
-| `pnpm data:validate` | 校验仓库里已提交的三份快照，不联网 |
+| `pnpm data:publish` | 把当前快照发布到 GitHub Release，更新 manifest |
+| `pnpm data:validate` | 校验本地三份快照的结构，不联网 |
 | `pnpm data:check` | 抽查热门流是否还能连上，需要外网 |
 
 `scripts/` 下另有地图底图、中国地名等构建脚本，只在数据更新时手动使用。
@@ -51,15 +53,22 @@ pnpm dev
 | `rest` | 其余有坐标的境外台 | 地图就绪后空闲加载 |
 | `catalog` | 无坐标、可播但无法上图 | 搜索词达到 2 个字或开始筛选时 |
 
+快照不再进 git 历史，而是发布成 GitHub Release；仓库里只跟踪 [`data/manifest.json`](data/manifest.json)（tag、文件大小与 sha256）。`pnpm dev` / `pnpm build` 前会自动执行 `fetch-data --if-missing`，首次克隆会拉取一次并校验；也可以手动执行：
+
+```bash
+pnpm data:pull
+```
+
 周更流程：
 
 ```bash
 pnpm data:release     # 拉全量 + 校验 + 构建；失败不会写入任何文件
+pnpm data:publish     # 创建数据 release，更新 manifest（--dry-run 只写 manifest）
 pnpm data:check       # 抽查热门流
 pnpm data:validate    # 复查快照结构
 ```
 
-构建脚本会在写盘前检查分片结构、跨片重复和数量骤降（低于上一版 85% 直接失败）；确认数据确实变少时用 `node scripts/build-stations.mjs --force`。
+构建脚本会在写盘前检查分片结构、跨片重复和数量骤降（低于上一版 85% 直接失败）；确认数据确实变少时用 `node scripts/build-stations.mjs --force`。发布后记得提交更新过的 `data/manifest.json`，否则 CI 会按旧哈希拉取。
 
 ## 目录
 
@@ -81,10 +90,9 @@ tests/          Node 测试
 
 ## 测试与 CI
 
-`pnpm test` 覆盖 107 个纯逻辑用例；`pnpm e2e` 是 Playwright 冒烟，覆盖首屏、搜索、点台、深链和抽屉五条路径。本地首次运行前需要安装依赖与 Chromium：
+`pnpm test` 覆盖 118 个纯逻辑用例；`pnpm e2e` 是 Playwright 冒烟，覆盖首屏、搜索、点台、深链和抽屉五条路径。本地首次运行前需要下载 Chromium：
 
 ```bash
-pnpm add -D @playwright/test
 pnpm exec playwright install chromium
 ```
 
