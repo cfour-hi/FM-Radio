@@ -87,6 +87,7 @@ export function pick(raw, { allowNoGeo = false } = {}) {
     lat: geo?.lat ?? null,
     lon: geo?.lon ?? null,
     homepage: text(raw.homepage),
+    favicon: text(raw.favicon),
     /** 归属字段由 resolveStation / inferChinaGeo 填，默认空 */
     province: null,
     provinceCode: null,

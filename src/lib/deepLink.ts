@@ -6,6 +6,8 @@
  */
 
 export const STATION_PARAM = "s";
+export const COUNTRY_PARAM = "c";
+export const PROVINCE_PARAM = "p";
 
 /** 台 id 是 radio-browser 的 uuid，只可能由这些字符组成；不合法就当作没有 */
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -18,6 +20,25 @@ export function readStationId(
   if (!raw) return null;
   const id = raw.trim();
   return ID_PATTERN.test(id) ? id : null;
+}
+
+/** 分享「某个国家/地区」用的两位国家代码；不合法返回 null。 */
+export function readCountryCode(
+  search: string = typeof window === "undefined" ? "" : window.location.search,
+): string | null {
+  if (!search) return null;
+  const raw = new URLSearchParams(search).get(COUNTRY_PARAM)?.trim() ?? "";
+  return /^[A-Za-z]{2}$/.test(raw) ? raw.toUpperCase() : null;
+}
+
+/** 省份/州名；只做长度与尖括号校验，具体是否存在交给浏览视图处理。 */
+export function readProvince(
+  search: string = typeof window === "undefined" ? "" : window.location.search,
+): string | null {
+  if (!search) return null;
+  const raw = new URLSearchParams(search).get(PROVINCE_PARAM)?.trim() ?? "";
+  if (!raw || raw.length > 20 || /[<>]/.test(raw)) return null;
+  return raw;
 }
 
 /**

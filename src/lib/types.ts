@@ -16,6 +16,10 @@ export type Station = {
   state: string | null;
   languages: string[];
   tags: string[];
+  /** 台名全拼 + 首字母（只对含汉字的台名生成；旧快照为空） */
+  pinyinName: string[];
+  /** 省 / 市 / place 的罗马化与首字母（只对中国台生成；旧快照为空） */
+  pinyinPlace: string[];
   /** MP3 / AAC / AAC+ / OGG / UNKNOWN */
   codec: string;
   bitrate: number;

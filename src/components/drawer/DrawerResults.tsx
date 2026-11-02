@@ -14,6 +14,7 @@ type Props = {
   topPicks: Station[];
   filtering: boolean;
   total: number;
+  hiddenIds: ReadonlySet<string>;
   onPickStation: (station: Station) => void;
   onLoadMore: () => void;
 };
@@ -36,9 +37,16 @@ export default function DrawerResults({
   topPicks,
   filtering,
   total,
+  hiddenIds,
   onPickStation,
   onLoadMore,
 }: Props) {
+  const noteFor = (station: Station): string => {
+    if (hiddenIds.has(station.id)) return "已隐藏";
+    if (showNearby && whereSource === "browser") return distanceNotes.get(station.id) ?? "";
+    return station.geo ? "" : "无法定位";
+  };
+
   return (
     <div data-drawer-scroll className="min-h-0 flex-1 overflow-y-auto">
       {items.length === 0 ? (
@@ -85,7 +93,7 @@ export default function DrawerResults({
                 active={index === active}
                 query={searching ? deferredQuery : undefined}
                 onPick={onPickStation}
-                note={showNearby && whereSource === "browser" ? distanceNotes.get(station.id) ?? "" : station.geo ? "" : "无法定位"}
+                note={noteFor(station)}
               />
             ))}
           </ul>

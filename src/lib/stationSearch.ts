@@ -1,5 +1,6 @@
 import { regionLabel } from "./cnEnrichment";
 import { countryNameOf } from "./countryNames";
+import { aliasFor } from "./stationAliases";
 import type { Station } from "./types";
 
 /*
@@ -11,7 +12,14 @@ import type { Station } from "./types";
  * 展示名——用户看到的是那个写法，搜的时候就会照那个写法打。
  */
 
-type Entry = { station: Station; name: string; region: string[] };
+type Entry = {
+  station: Station;
+  name: string;
+  region: string[];
+  /** 台名拼音与地名罗马化，均已是 fold 过的 ASCII token */
+  pinyinName: string[];
+  pinyinPlace: string[];
+};
 
 const richIndexes = new WeakMap<Station[], Entry[]>();
 
@@ -40,7 +48,13 @@ function regionTokens(station: Station): string[] {
 
 function buildRichIndex(stations: Station[]): Entry[] {
   const index = stations
-    .map((station) => ({ station, name: fold(station.name), region: regionTokens(station) }))
+    .map((station) => ({
+      station,
+      name: fold(station.name),
+      region: regionTokens(station),
+      pinyinName: (station.pinyinName ?? []).map(fold),
+      pinyinPlace: (station.pinyinPlace ?? []).map(fold),
+    }))
     .sort((a, b) => b.station.clicks - a.station.clicks);
   richIndexes.set(stations, index);
   return index;
@@ -72,6 +86,11 @@ export function searchStations(
 
   const index = richIndexes.get(stations) ?? buildRichIndex(stations);
   const allowRegion = needle.length >= 2;
+  const alias = aliasFor(needle);
+  const needles = alias ? [needle, alias] : [needle];
+
+  const starts = (text: string) => needles.some((value) => text.startsWith(value));
+  const includes = (text: string) => needles.some((value) => text.includes(value));
 
   const matched: { station: Station; tier: number; order: number }[] = [];
   let regionTotal = 0;
@@ -79,9 +98,12 @@ export function searchStations(
   for (let order = 0; order < index.length; order++) {
     const entry = index[order]!;
     let tier = -1;
-    if (entry.name.startsWith(needle)) tier = 0;
-    else if (entry.name.includes(needle)) tier = 1;
-    else if (allowRegion && entry.region.some((token) => token.startsWith(needle))) {
+    if (starts(entry.name) || entry.pinyinName.some(starts)) tier = 0;
+    else if (includes(entry.name) || entry.pinyinName.some(includes)) tier = 1;
+    else if (
+      allowRegion &&
+      (entry.region.some(starts) || entry.pinyinPlace.some(starts))
+    ) {
       tier = 2;
       regionTotal++;
     }

@@ -18,23 +18,39 @@ import {
   writeRecents,
 } from "../lib/recents";
 import { readLegacyFavorites, readLegacyRecents } from "../lib/legacyDb";
+import {
+  hide,
+  readHidden,
+  unhide,
+  unhideAll,
+  type HiddenEntry,
+  type HiddenReason,
+} from "../lib/hiddenStations";
 import type { Station } from "../lib/types";
 
 type LibraryState = {
   favorites: Station[];
   favoriteIds: Set<string>;
   recents: Station[];
+  hidden: HiddenEntry[];
+  hiddenIds: Set<string>;
   hydrate: () => Promise<void>;
   toggleFavorite: (station: Station) => void;
   isFavorite: (id: string) => boolean;
   remember: (station: Station) => void;
   forgetRecents: () => void;
+  refreshHidden: () => void;
+  hideStation: (station: Station, reason?: HiddenReason) => void;
+  unhideStation: (id: string) => void;
+  unhideAllStations: () => void;
 };
 
 export const useLibrary = create<LibraryState>((set, get) => ({
   favorites: [],
   favoriteIds: new Set(),
   recents: [],
+  hidden: [],
+  hiddenIds: new Set(),
 
   hydrate: async () => {
     // 收藏从 localStorage 同步读取；首次启动还要把 IndexedDB 里的旧收藏并进来
@@ -57,10 +73,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       recents = merged;
     }
 
+    const hidden = readHidden();
     set({
       favorites,
       favoriteIds: new Set(favorites.map((s) => s.id)),
       recents,
+      hidden,
+      hiddenIds: new Set(hidden.map((entry) => entry.id)),
     });
   },
 
@@ -94,5 +113,25 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   forgetRecents: () => {
     set({ recents: [] });
     clearRecents();
+  },
+
+  refreshHidden: () => {
+    const hidden = readHidden();
+    set({ hidden, hiddenIds: new Set(hidden.map((entry) => entry.id)) });
+  },
+
+  hideStation: (station, reason = "manual") => {
+    const hidden = hide(station, reason);
+    set({ hidden, hiddenIds: new Set(hidden.map((entry) => entry.id)) });
+  },
+
+  unhideStation: (id) => {
+    const hidden = unhide(id);
+    set({ hidden, hiddenIds: new Set(hidden.map((entry) => entry.id)) });
+  },
+
+  unhideAllStations: () => {
+    const hidden = unhideAll();
+    set({ hidden, hiddenIds: new Set(hidden.map((entry) => entry.id)) });
   },
 }));

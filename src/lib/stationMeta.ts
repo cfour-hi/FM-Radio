@@ -1,4 +1,5 @@
 import { regionLabel } from "./cnEnrichment";
+import { countryNameOf } from "./countryNames";
 import type { Station } from "./types";
 
 /*
@@ -27,7 +28,8 @@ export function stationMeta(station: Station): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   const region = regionOf(station);
-  const parts = [region || station.countryName || station.countryCode, station.languages[0], station.tags[0]];
+  const country = countryNameOf(station.countryCode) || station.countryName || station.countryCode;
+  const parts = [region || country, station.languages[0], station.tags[0]];
   for (const part of parts) {
     const value = part?.trim();
     if (!value) continue;
@@ -62,7 +64,7 @@ export function regionOf(station: Station): string {
 export function placeOf(station: Station): string {
   const region = regionOf(station);
   if (region) return region;
-  return station.state?.trim() || station.countryName?.trim() || station.countryCode;
+  return station.state?.trim() || countryNameOf(station.countryCode) || station.countryName?.trim() || station.countryCode;
 }
 
 export type HighlightSegment = { text: string; hit: boolean };

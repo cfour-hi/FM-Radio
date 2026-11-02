@@ -1,10 +1,14 @@
 import { checkSupport } from "../lib/capability";
 import { pickAlternatives } from "../lib/stationAlternatives";
+import { AUTO_SWITCH_LIMIT, pickFallback, shouldAutoSwitch } from "../lib/autoFallback";
+import { recordFailure } from "../lib/hiddenStations";
+import { isPlayable } from "../lib/stationFilter";
 import type { Station } from "../lib/types";
 import { engine, type EngineStatus } from "../player/engine";
 import type { EngineErrorKind } from "../player/errors";
 import { bindMediaSession, syncMediaSession } from "../player/mediaSession";
 import { create } from "zustand";
+import { useLibrary } from "./library";
 
 type PlayerState = {
   station: Station | null;
@@ -25,7 +29,12 @@ type PlayerState = {
   sleepExpired: boolean;
   setSleep: (minutes: number | null) => void;
   expireSleep: () => void;
-  play: (station: Station, queue?: Station[], remember?: boolean) => void;
+  /** 自动换台后的提示；用户可以撤销回到原来那个台 */
+  autoSwitchNotice: { from: Station; to: Station; at: number } | null;
+  dismissAutoSwitch: () => void;
+  undoAutoSwitch: () => void;
+  /** 内部 auto=true 表示自动换台，不重置本次失败事件的状态 */
+  play: (station: Station, queue?: Station[], remember?: boolean, auto?: boolean) => void;
   toggle: () => void;
   pause: () => void;
   resume: () => void;
@@ -105,6 +114,76 @@ const savedSleep = readSleep();
 const initialVolume = Math.min(1, Math.max(0, readPref(VOLUME_KEY, 0.8)));
 const initialMuted = readPref(MUTE_KEY, 0) === 1;
 
+/*
+ * 自动换台的「一次失败事件」状态。
+ *
+ * 放在模块级：它只影响行为，不参与渲染，放进 store 会让每次尝试都触发
+ * 重渲染。tried 记住本次事件里已经试过的台，count 限制连续换台次数。
+ */
+const episode = { tried: new Set<string>(), count: 0 };
+let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let playingTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearHandle(handle: ReturnType<typeof setTimeout> | null): null {
+  if (handle !== null) clearTimeout(handle);
+  return null;
+}
+
+function resetEpisode(): void {
+  episode.tried.clear();
+  episode.count = 0;
+  fallbackTimer = clearHandle(fallbackTimer);
+  playingTimer = clearHandle(playingTimer);
+}
+
+/**
+ * 失败后等 300ms 再换：引擎可能在同一轮里先报 media error 再报超时，
+ * 立刻换会连着触发两次。换台前重新确认当前台和状态，避免用户已经手动切走。
+ */
+function scheduleAutoSwitch(station: Station): void {
+  if (episode.count >= AUTO_SWITCH_LIMIT) return;
+  fallbackTimer = clearHandle(fallbackTimer);
+  fallbackTimer = setTimeout(() => {
+    fallbackTimer = null;
+    const state = usePlayer.getState();
+    if (state.status !== "error" || state.station?.id !== station.id) return;
+    if (state.sleepExpired || episode.count >= AUTO_SWITCH_LIMIT) return;
+
+    const hidden = useLibrary.getState().hiddenIds;
+    const pick = pickFallback(station, state.queue, episode.tried, hidden);
+    if (!pick) return;
+
+    episode.tried.add(station.id);
+    episode.tried.add(pick.id);
+    episode.count += 1;
+
+    const at = Date.now();
+    state.play(pick, state.queue, false, true);
+    usePlayer.setState({ autoSwitchNotice: { from: station, to: pick, at } });
+    // 8 秒后收起提示；用 at 判断，避免把更新的提示误清掉
+    setTimeout(() => {
+      if (usePlayer.getState().autoSwitchNotice?.at === at) {
+        usePlayer.setState({ autoSwitchNotice: null });
+      }
+    }, 8000);
+  }, 300);
+}
+
+/** 连续播放 5 秒才算这次事件结束；被隐藏的台也在这里自愈。 */
+function schedulePlayingSettled(station: Station): void {
+  playingTimer = clearHandle(playingTimer);
+  playingTimer = setTimeout(() => {
+    playingTimer = null;
+    const state = usePlayer.getState();
+    if (state.status !== "playing" || state.station?.id !== station.id) return;
+    episode.tried.clear();
+    episode.count = 0;
+    if (useLibrary.getState().hiddenIds.has(station.id)) {
+      useLibrary.getState().unhideStation(station.id);
+    }
+  }, 5000);
+}
+
 export const usePlayer = create<PlayerState>((set, get) => ({
   station: null,
   status: "idle",
@@ -117,6 +196,19 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   history: [],
   sleepUntil: savedSleep !== null && savedSleep > Date.now() ? savedSleep : null,
   sleepExpired: savedSleep !== null && savedSleep <= Date.now(),
+  autoSwitchNotice: null,
+  dismissAutoSwitch: () => set({ autoSwitchNotice: null }),
+  undoAutoSwitch: () => {
+    const notice = get().autoSwitchNotice;
+    if (!notice) return;
+    // 把新旧两个台都记进 tried：撤销不是新一轮，不能立刻又切回刚失败的台
+    episode.tried.add(notice.from.id);
+    episode.tried.add(notice.to.id);
+    episode.count = 0;
+    playingTimer = clearHandle(playingTimer);
+    set({ autoSwitchNotice: null });
+    get().play(notice.from, get().queue, false, true);
+  },
   setSleep: (minutes) => {
     if (minutes !== null && ![15, 30, 60].includes(minutes)) return;
     const sleepUntil = minutes === null ? null : Date.now() + minutes * 60_000;
@@ -125,7 +217,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
   expireSleep: () => {
     writeSleep(0);
-    set({ sleepUntil: null, sleepExpired: true });
+    resetEpisode();
+    set({ sleepUntil: null, sleepExpired: true, autoSwitchNotice: null });
     // 停止并释放连接，防止尚在加载的 HLS 异步回调在到期后开始播放。
     engine.stop();
     set({ status: "paused", error: null, errorKind: null, elapsed: 0 });
@@ -140,8 +233,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     return entry.station;
   },
 
-  play: (station, queue, remember = true) => {
+  play: (station, queue, remember = true, auto = false) => {
     const state = get();
+    if (!auto) {
+      resetEpisode();
+      if (state.autoSwitchNotice) set({ autoSwitchNotice: null });
+    }
     if (state.sleepExpired) { writeSleep(null); set({ sleepExpired: false }); }
     if (remember && state.station && state.station.id !== station.id) {
       set({ history: [...state.history, { station: state.station, queue: state.queue }].slice(-50) });
@@ -218,15 +315,16 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (queue.length === 0) return false;
 
     const index = station ? queue.findIndex((s) => s.id === station.id) : -1;
+    const hidden = useLibrary.getState().hiddenIds;
 
-    // 跳过当前浏览器播不了的台，避免「下一台」连着几次都不出声
+    // 跳过格式不支持、证书异常或本地隐藏的台，避免「下一台」连着几次都不出声
     for (let step = 1; step <= queue.length; step++) {
       const raw = index + step * direction;
       const candidate = queue[((raw % queue.length) + queue.length) % queue.length];
       if (!candidate) continue;
       // 只有一台时绕一圈会回到自己，那不是「下一台」
       if (candidate.id === station?.id) continue;
-      if (!checkSupport(candidate).ok) continue;
+      if (!isPlayable(candidate, hidden)) continue;
       get().play(candidate);
       return true;
     }
@@ -236,6 +334,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   retry: () => {
     const { station } = get();
     if (!station) return;
+    resetEpisode();
+    if (get().autoSwitchNotice) set({ autoSwitchNotice: null });
     if (get().sleepExpired) { writeSleep(null); set({ sleepExpired: false }); }
     const support = checkSupport(station);
     if (!support.ok) {
@@ -250,7 +350,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   errorAlternative: () => {
     const { station, queue } = get();
     if (!station) return;
-    const [pick] = pickAlternatives(station, queue, (s) => checkSupport(s).ok && !s.sslError, 1);
+    const hidden = useLibrary.getState().hiddenIds;
+    const [pick] = pickAlternatives(station, queue, (s) => isPlayable(s, hidden), 1);
     // 没有替代时按钮根本不会显示，这里静默返回即可
     if (pick) get().play(pick);
   },
@@ -272,9 +373,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   stop: () => {
+    resetEpisode();
     get().setSleep(null);
     engine.stop();
-    set({ station: null, status: "idle", error: null, errorKind: null, elapsed: 0 });
+    set({ station: null, status: "idle", error: null, errorKind: null, elapsed: 0, autoSwitchNotice: null });
     syncMediaSession(null, "idle");
   },
 }));
@@ -286,13 +388,29 @@ engine.hooks = {
     const station = usePlayer.getState().station;
     if (!station) return;
     syncMediaSession(station, status);
-    /*
-     * 真正出声之后才记「上次收听」。
-     *
-     * 从前是在 play() 里写的，那时还不能确定这个台能不能播：分享链接指向一个
-     * 已经停播的台，也会被写进去，下次刷新就默认恢复一个坏台。
-     */
-    if (status === "playing") writeLastStation(station);
+
+    if (status === "playing") {
+      /*
+       * 真正出声之后才记「上次收听」。
+       *
+       * 从前是在 play() 里写的，那时还不能确定这个台能不能播：分享链接指向一个
+       * 已经停播的台，也会被写进去，下次刷新就默认恢复一个坏台。
+       */
+      writeLastStation(station);
+      schedulePlayingSettled(station);
+      return;
+    }
+
+    if (status === "error" && kind) {
+      playingTimer = clearHandle(playingTimer);
+      const hiddenNow = recordFailure(station, kind);
+      if (hiddenNow && !useLibrary.getState().hiddenIds.has(station.id)) {
+        useLibrary.getState().refreshHidden();
+      }
+      if (shouldAutoSwitch(kind) && !usePlayer.getState().sleepExpired) {
+        scheduleAutoSwitch(station);
+      }
+    }
   },
   onTick: (elapsed) => {
     usePlayer.setState({ elapsed });

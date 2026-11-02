@@ -42,6 +42,12 @@ test("台名命中优先于地区命中", () => {
   assert.equal(regionTotal, 1, "台名命中的那个不计入地区总数");
 });
 
+test("英文国名与中文国名都能搜到", () => {
+  const stations = [station("fr", "B 台", 1, { countryCode: "FR", countryName: "France" })];
+  assert.deepEqual(searchStations(stations, "france").hits.map((s) => s.id), ["fr"]);
+  assert.deepEqual(searchStations(stations, "法国").hits.map((s) => s.id), ["fr"]);
+});
+
 test("按省份、城市、国家都能搜到，包括省市连写", () => {
   const stations = [
     station("hn", "A 台", 1, { province: "湖南", city: "长沙" }),
@@ -86,6 +92,27 @@ test("大小写与变音符号不影响匹配", () => {
   const stations = [station("sao", "São Paulo FM", 1), station("paris", "PARIS Jazz", 2)];
   assert.deepEqual(searchStations(stations, "sao").hits.map((s) => s.id), ["sao"]);
   assert.deepEqual(searchStations(stations, "paris").hits.map((s) => s.id), ["paris"]);
+});
+
+test("拼音、首字母与英文旧称都能命中", () => {
+  const stations = [
+    station("hn", "湖南交通广播", 10, {
+      province: "湖南",
+      pinyinName: ["hunanjiaotongguangbo", "hnjtgb"],
+      pinyinPlace: ["hunan", "changsha"],
+    }),
+    station("bj", "北京新闻广播", 5, {
+      province: "北京",
+      pinyinName: ["beijingxinwenguangbo", "bjxwgb"],
+      pinyinPlace: ["beijing"],
+    }),
+  ];
+
+  assert.deepEqual(searchStations(stations, "hunan").hits.map((s) => s.id), ["hn"]);
+  assert.deepEqual(searchStations(stations, "hnjt").hits.map((s) => s.id), ["hn"]);
+  assert.deepEqual(searchStations(stations, "changsha").hits.map((s) => s.id), ["hn"]);
+  assert.deepEqual(searchStations(stations, "beijing").hits.map((s) => s.id), ["bj"]);
+  assert.deepEqual(searchStations(stations, "peking").hits.map((s) => s.id), ["bj"]);
 });
 
 test("不改变传入的数组顺序，空关键词不返回结果", () => {

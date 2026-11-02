@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Station } from "../lib/types";
-import { checkSupport } from "../lib/capability";
+import { countryNameOf } from "../lib/countryNames";
+import { isPlayable } from "../lib/stationFilter";
 import { pickRandom, randomPool, type RandomScope } from "../lib/stationDiscovery";
 import { useLibrary } from "../store/library";
 import { usePlayer } from "../store/player";
@@ -26,9 +27,10 @@ export default function RandomExplorer({ stations, onLocate, panelOpen }: { stat
   const [recent, setRecent] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const favorites = useLibrary((s) => s.favorites);
+  const hiddenIds = useLibrary((s) => s.hiddenIds);
   const current = usePlayer((s) => s.station);
   const pool = useMemo(() => randomPool(stations, favorites, scope, current)
-    .filter((s) => !s.sslError && checkSupport(s).ok), [stations, favorites, scope, current]);
+    .filter((s) => isPlayable(s, hiddenIds)), [stations, favorites, scope, current, hiddenIds]);
   const choose = () => {
     const pick = pickRandom(pool, current?.id ?? null, recent);
     if (!pick) { setMessage("这个范围暂时没有其他可选电台"); return; }
@@ -56,7 +58,11 @@ export default function RandomExplorer({ stations, onLocate, panelOpen }: { stat
             <option value="favorites">我的收藏</option>
           </select>
         </label>
-        {scope === "region" && <p className="mt-2 text-[11px] text-muted">{current?.province || current?.countryName || current?.countryCode}</p>}
+        {scope === "region" && (
+          <p className="mt-2 text-[11px] text-muted">
+            {current?.province || current?.state || countryNameOf(current?.countryCode ?? "") || current?.countryName || current?.countryCode}
+          </p>
+        )}
         <button type="button" onClick={choose} className="mt-3 min-h-10 w-full rounded border border-signal/40 bg-signal-soft text-[12px] text-signal">随机点亮</button>
         <p role="status" className="mt-2 text-[11px] text-muted">{message || "避开刚听过的台，可在播放器返回上一站"}</p>
       </div>

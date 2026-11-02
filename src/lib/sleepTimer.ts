@@ -1,3 +1,24 @@
+/** 睡眠定时到期前多久开始降低音量 */
+export const SLEEP_FADE_MS = 30_000;
+
+/**
+ * 算出淡出的开始延迟与时长。
+ *
+ * 剩余时间不足一个淡出窗口时立即开始、只淡当前剩余的那段；
+ * 已经过期的截止时间返回 null（由 expiry 自己处理）。
+ */
+export function fadePlan(
+  until: number | null,
+  now = Date.now(),
+  duration = SLEEP_FADE_MS,
+): { delay: number; duration: number } | null {
+  if (until === null || !Number.isFinite(until) || duration <= 0) return null;
+  const remaining = until - now;
+  if (remaining <= 0) return null;
+  if (remaining <= duration) return { delay: 0, duration: remaining };
+  return { delay: remaining - duration, duration };
+}
+
 /** 使用绝对截止时间，后台节流或设备休眠后检查不会重新开始倒计时。 */
 export function createSleepTimer(
   expire: () => void,

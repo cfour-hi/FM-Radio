@@ -30,6 +30,7 @@ import { inferChinaGeo } from "./cn-geo.mjs";
 import { CAPITALS } from "./cn-admin.mjs";
 import { get, pick, dropOutliers } from "./lib/radio.mjs";
 import { checkShrink, validateSnapshot } from "./lib/snapshot.mjs";
+import { createPinyinTools } from "./lib/pinyin.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(HERE, "../src/data");
@@ -66,13 +67,14 @@ const SHARDS = {
 const round3 = (value) =>
   typeof value === "number" && Number.isFinite(value) ? Math.round(value * 1e3) / 1e3 : value;
 
-/* 前 18 列保持兼容，追加语言与类型原始元数据。 */
+/* 前 18 列保持兼容，追加语言、类型、主页/图标与拼音 token。 */
 const FIELDS = [
   "id", "name", "url", "cc", "country", "codec", "bitrate", "lat", "lon",
   "clicks", "hls", "sslError", "state", "approx", "place", "province", "city", "prec", "languages", "tags",
+  "homepage", "favicon", "pyName", "pyPlace",
 ];
 
-const toRow = (s) => [
+const toRow = (s, tools) => [
   s.id,
   s.name,
   s.url,
@@ -94,6 +96,10 @@ const toRow = (s) => [
   s.geoPrecision === "city" ? 0 : s.geoPrecision === "province" ? 1 : 2,
   s.languages || "",
   s.tags || "",
+  s.homepage || "",
+  s.favicon || "",
+  tools.nameTokens(s.name).join(","),
+  tools.placeTokens(s).join(","),
 ];
 
 /** 不带 countrycode，按点击量倒序翻页拉全量。 */
@@ -167,6 +173,8 @@ async function readPreviousCounts() {
 
 async function main() {
   const t0 = Date.now();
+  // pinyin-pro 是可选依赖；缺失时 tools 仍会生成地名罗马化
+  const tools = await createPinyinTools();
 
   const inputArg = process.argv.find((a) => a.startsWith("--input="));
   let all;
@@ -262,17 +270,23 @@ async function main() {
     ...base,
     fields: FIELDS,
     meta: { capitals: CAPITALS, cityAlias },
-    stations: core.map(toRow),
+    stations: core.map((station) => toRow(station, tools)),
   });
   const restBody = JSON.stringify({
     ...base,
     fields: FIELDS,
-    stations: rest.map(toRow),
+    stations: rest.map((station) => toRow(station, tools)),
   });
   const catalogBody = JSON.stringify({
     ...base,
-    fields: ["id", "name", "cc", "clicks", "url", "languages", "tags"],
-    stations: catalog.map((s) => [s.id, s.name, s.countryCode, s.clicks, s.url, s.languages || "", s.tags || ""]),
+    fields: ["id", "name", "cc", "clicks", "url", "languages", "tags", "homepage", "favicon", "pyName", "pyPlace"],
+    stations: catalog.map((s) => [
+      s.id, s.name, s.countryCode, s.clicks, s.url, s.languages || "", s.tags || "",
+      // 目录有两万多个台、只在搜索时加载；官网/图标不写，避免给懒加载分片加半兆
+      "", "",
+      tools.nameTokens(s.name).join(","),
+      "",
+    ]),
   });
 
   await writeFile(resolve(OUT_DIR, SHARDS.core), coreBody);

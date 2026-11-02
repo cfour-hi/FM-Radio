@@ -3,9 +3,11 @@
 一个纯前端的全球电台地图：转动地球，点一个光点，听那个地方此刻正在说的话。
 
 - 10,000+ 个电台落在球面上；中国台按台名推断到城市，并标注估算
-- 搜索台名、省份、城市或国家，按语言与类型筛选
+- 搜索台名、省份、城市或国家，支持拼音、首字母与英文旧称
+- 按国家 / 地区浏览，中国可继续下钻到城市
 - 收藏、最近收听、附近电台、随机探索、返回上一站
-- 睡眠定时、分享深链、Media Session 锁屏控制
+- 连不上时自动换到同城/同省替代台，坏台可在本地隐藏
+- 睡眠定时与淡出、系统分享、分享深链、Media Session 锁屏控制
 - 银河 / 星流 / 极光三种粒子特效壁纸
 
 没有账号、没有后端；收藏与收听记录只保存在本机。
@@ -14,9 +16,9 @@
 
 ![地球视图：球面上分布着电台光点，标签显示台名](docs/images/desktop-globe.jpg)
 
-| 搜索与筛选 | 手机收听 |
-| :---: | :---: |
-| <img src="docs/images/desktop-search.jpg" alt="搜索抽屉：按台名、省份、城市或国家筛选" width="560" /> | <img src="docs/images/mobile-player.jpg" alt="移动端播放器与地图" width="240" /> |
+| 搜索与筛选 | 国家浏览 | 手机收听 |
+| :---: | :---: | :---: |
+| <img src="docs/images/desktop-search.jpg" alt="搜索抽屉：按台名、省份、城市或国家筛选" width="380" /> | <img src="docs/images/desktop-browse.jpg" alt="国家浏览：中国 → 湖南，按城市筛选" width="380" /> | <img src="docs/images/mobile-player.jpg" alt="移动端播放器与地图" width="180" /> |
 
 > 截图来自当前开发版本；标签密度与推荐结果会随电台快照变化。
 
@@ -67,7 +69,9 @@ pnpm dev
 | --- | --- | --- |
 | `core` | 中国全部 + 境外点击量前 1000 | 首屏，地图就绪前 |
 | `rest` | 其余有坐标的境外台 | 地图就绪后空闲加载 |
-| `catalog` | 无坐标、可播但无法上图 | 搜索词达到 2 个字或开始筛选时 |
+| `catalog` | 无坐标、可播但无法上图 | 搜索词达到 2 个字、开始筛选或打开「国家」时 |
+
+快照行在末尾追加了 `homepage`、`favicon`、`pyName`、`pyPlace` 四列：前两列用于播放器里的官网/图标，后两列是台名全拼与地名罗马化。台名全拼需要开发依赖 `pinyin-pro`（`pnpm add -D pinyin-pro`）；没装时构建只生成地名罗马化，搜索仍可用 `hunan`、`changsha`。
 
 快照不再进 git 历史，而是发布成 GitHub Release；仓库里只跟踪 [`data/manifest.json`](data/manifest.json)（tag、文件大小与 sha256）。`pnpm dev` / `pnpm build` 前会自动执行 `fetch-data --if-missing`，首次克隆会拉取一次并校验；也可以手动执行：
 
@@ -112,7 +116,7 @@ tests/          Node 测试
 
 ## 测试与 CI
 
-`pnpm test` 覆盖 118 个纯逻辑用例；`pnpm e2e` 是 Playwright 冒烟，覆盖首屏、搜索、点台、深链和抽屉五条路径。本地首次运行前需要下载 Chromium：
+`pnpm test` 覆盖 145 个纯逻辑用例；`pnpm e2e` 是 Playwright 冒烟，覆盖首屏、搜索、点台、深链、国家浏览和抽屉六条路径。本地首次运行前需要下载 Chromium：
 
 ```bash
 pnpm exec playwright install chromium

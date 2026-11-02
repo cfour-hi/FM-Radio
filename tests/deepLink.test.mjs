@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { importTs } from "./tsLoader.mjs";
 
-const { readStationId, buildStationUrl, STATION_PARAM } = await importTs("../src/lib/deepLink.ts");
+const { readStationId, readCountryCode, readProvince, buildStationUrl, STATION_PARAM } =
+  await importTs("../src/lib/deepLink.ts");
 
 test("从查询串里认出电台 id", () => {
   assert.equal(readStationId("?s=abc"), "abc");
@@ -18,6 +19,20 @@ test("可疑的 id 一律当作没有", () => {
   assert.equal(readStationId("?s=<script>"), null);
   assert.equal(readStationId(`?s=${"a".repeat(65)}`), null, "超过 64 位不认");
   assert.equal(readStationId(`?s=${"a".repeat(64)}`), "a".repeat(64), "刚好 64 位可以");
+});
+
+test("国家/省份深链参数会做基本校验", () => {
+  assert.equal(readCountryCode("?c=jp"), "JP");
+  assert.equal(readCountryCode("?c=CN&p=湖南"), "CN");
+  assert.equal(readCountryCode("?c=jpn"), null, "只认两位代码");
+  assert.equal(readCountryCode("?c="), null);
+  assert.equal(readCountryCode(""), null);
+
+  assert.equal(readProvince("?p=湖南"), "湖南");
+  assert.equal(readProvince("?p=%20%E6%B9%96%E5%8D%97%20"), "湖南", "两侧空白去掉");
+  assert.equal(readProvince("?p=<script>"), null);
+  assert.equal(readProvince(`?p=${"湖".repeat(21)}`), null, "过长不认");
+  assert.equal(readProvince(""), null);
 });
 
 test("分享链接保留发布平台的参数，只摘掉调试用的 guide", () => {

@@ -5,6 +5,7 @@ import {
   NextButton,
   PlayToggle,
   PreviousButton,
+  ShareButton,
   VolumeSlider,
 } from "./PlayerButtons";
 import type { EngineStatus } from "../../player/engine";
@@ -36,6 +37,7 @@ export function MobileControls({
       <PlayToggle playing={playing} erroring={erroring && !failedForAutoplay} status={status} onToggle={onToggle} />
       <NextButton onClick={onNext} />
       <FavoriteButton station={station} />
+      <ShareButton station={station} />
       <MuteButton />
     </div>
   );

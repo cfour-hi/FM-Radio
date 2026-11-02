@@ -149,6 +149,66 @@ export function CopyLinkButton({ station }: { station: Station }) {
   );
 }
 
+/*
+ * 分享这个台。
+ *
+ * 手机上优先调系统分享面板；不支持时才退回剪贴板。和复制链接一样，
+ * 链接会保留当前 URL 的 sharecode / 其它参数。
+ */
+export function ShareButton({ station }: { station: Station }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const share = async () => {
+    const url = buildStationUrl(station.id);
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: station.name, text: `正在收听 ${station.name}`, url });
+        return;
+      } catch (error) {
+        // 用户取消不算失败；其它错误继续尝试剪贴板
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(url);
+      setCopied(true);
+    } catch {
+      /* 没有剪贴板权限时静默失败 */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void share()}
+      aria-label={copied ? "已复制链接" : "分享这个台"}
+      title={copied ? "已复制" : "分享"}
+      className={cn(
+        "grid h-11 w-11 sm:h-9 sm:w-9 shrink-0 place-items-center rounded transition-colors",
+        copied ? "text-signal" : "text-dim hover:text-muted",
+      )}
+    >
+      {copied ? (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 15V4" />
+          <path d="m8 8 4-4 4 4" />
+          <path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /* 静音键。iOS 上 canSetVolume 为 false，音量写不进去，连静音也一起隐藏。 */
 export function MuteButton() {
   const muted = usePlayer((s) => s.muted);

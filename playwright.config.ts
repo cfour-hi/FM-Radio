@@ -12,7 +12,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  timeout: 45_000,
+  // CI runner 上地图初始化、3.4MB catalog 下载都可能比本地慢，留足余量
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://127.0.0.1:5566",

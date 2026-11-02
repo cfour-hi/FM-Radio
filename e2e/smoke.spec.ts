@@ -18,7 +18,7 @@ async function openApp(page: Page): Promise<void> {
   }, GUIDE_KEY);
 
   await page.goto("/");
-  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible({ timeout: 45_000 });
 }
 
 async function openDrawer(page: Page) {
@@ -95,6 +95,18 @@ test("抽屉：可以打开和关闭", async ({ page }) => {
   const drawer = await openDrawer(page);
   await drawer.getByRole("button", { name: "收起面板" }).click();
   await expect(drawer).toBeHidden();
+});
+
+test("浏览：国家 tab 能进入中国并看到省份", async ({ page }) => {
+  await openApp(page);
+  const drawer = await openDrawer(page);
+
+  await drawer.getByRole("button", { name: "国家" }).click();
+  const china = drawer.locator('[data-browse-country="CN"]');
+  await expect(china).toBeVisible();
+  await china.click();
+
+  await expect(drawer.locator("[data-browse-region]").first()).toBeVisible();
 });
 
 test("抽屉：键盘焦点留在面板内，关闭后归还触发按钮", async ({ page }) => {

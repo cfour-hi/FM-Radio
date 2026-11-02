@@ -44,6 +44,9 @@ class PlayerEngine {
   private status: EngineStatus = "idle";
   private volume = 1;
   private muted = false;
+  /** 睡眠定时淡出用的乘子；不改用户保存的音量 */
+  private fade = 1;
+  private fadeTimer: number | null = null;
   /** 每次换台 +1，用来识别「加载 hls.js 期间用户又换了台」 */
   private loadToken = 0;
   /** 当前音源，HLS 退回时需要用它重新加载 */
@@ -62,6 +65,7 @@ class PlayerEngine {
   /* ---------------- 对外 ---------------- */
 
   load(station: Station, forceHls = false): void {
+    this.cancelFade();
     this.disposeSource();
 
     this.station = station;
@@ -152,6 +156,7 @@ class PlayerEngine {
 
   stop(): void {
     ++this.loadToken; // 也取消尚在等待 hls.js 下载的加载请求
+    this.cancelFade();
     this.disposeSource();
     this.station = null;
     this.pauseRequested = false;
@@ -163,10 +168,51 @@ class PlayerEngine {
   setVolume(volume: number, muted: boolean): void {
     this.volume = volume;
     this.muted = muted;
+    // 用户调音量时取消正在进行的睡眠淡出，别把人手动调的音量又压回去
+    this.cancelFade();
+  }
+
+  /**
+   * 睡眠定时到期前把音量逐步降到 0。
+   *
+   * 只改引擎内部的乘子，store 里保存的音量不变；换台或停止时 cancelFade
+   * 会把它复位。iOS 上 volume 是只读的，调用方应先判断 canSetVolume。
+   */
+  fadeOut(durationMs: number): void {
+    this.cancelFade();
+    const duration = Math.max(0, durationMs);
+    if (duration === 0) {
+      this.fade = 0;
+      this.applyVolume();
+      return;
+    }
+
+    const start = Date.now();
+    const step = () => {
+      const progress = Math.min(1, (Date.now() - start) / duration);
+      this.fade = 1 - progress;
+      this.applyVolume();
+      if (progress < 1) this.fadeTimer = window.setTimeout(step, 250);
+      else this.fadeTimer = null;
+    };
+    step();
+  }
+
+  /** 取消淡出并把音量恢复到用户设置的值。 */
+  cancelFade(): void {
+    if (this.fadeTimer !== null) {
+      window.clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+    this.fade = 1;
+    this.applyVolume();
+  }
+
+  private applyVolume(): void {
     const el = this.audio;
     if (!el) return;
-    el.volume = volume;
-    el.muted = muted;
+    el.volume = this.volume * this.fade;
+    el.muted = this.muted;
   }
 
   /* ---------------- 内部 ---------------- */
@@ -174,7 +220,7 @@ class PlayerEngine {
   private createAudio(): HTMLAudioElement {
     const el = new Audio();
     el.preload = "none";
-    el.volume = this.volume;
+    el.volume = this.volume * this.fade;
     el.muted = this.muted;
 
     const mine = () => el === this.audio;

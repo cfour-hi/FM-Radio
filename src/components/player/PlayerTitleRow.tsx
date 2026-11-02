@@ -19,10 +19,26 @@ export default function PlayerTitleRow({
   onLocate,
   onCollapse,
 }: Props) {
+  const favicon = station.favicon?.startsWith("https://") ? station.favicon : null;
+
   return (
     <>
       {/* 标题行：台名放大到 16px、可换行；移动端单行截断。点台名飞回它在地球上的位置 */}
       <div className="flex items-center gap-1.5 sm:px-3.5 sm:pt-3">
+        {favicon && (
+          <img
+            src={favicon}
+            alt=""
+            width={16}
+            height={16}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-4 w-4 shrink-0 rounded-[3px] object-cover"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+          />
+        )}
         <button
           type="button"
           onClick={onLocate}

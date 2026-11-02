@@ -45,7 +45,7 @@ test("所有现有目录分片携带真实元数据且列位置一致", () => {
   for (const part of ["core", "rest", "catalog"]) {
     const data = JSON.parse(readFileSync(new URL(`../src/data/stations-${part}.json`, import.meta.url)));
     const offset = part === "catalog" ? 5 : 18;
-    assert.deepEqual(data.fields.slice(offset), ["languages", "tags"]);
+    assert.deepEqual(data.fields.slice(offset), ["languages", "tags", "homepage", "favicon", "pyName", "pyPlace"]);
     assert.ok(data.stations.every((row) => typeof row[offset] === "string" && typeof row[offset+1] === "string"));
     assert.ok(data.stations.some((row) => row[offset] && row[offset+1]));
   }

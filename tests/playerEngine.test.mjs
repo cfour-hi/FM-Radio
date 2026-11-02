@@ -221,6 +221,36 @@ test("有缓冲但一直不出声，8 秒照样判失败", (t) => {
   assert.equal(env.timers.size, 0);
 });
 
+test("睡眠淡出逐步降低音量，换台后复位", (t) => {
+  const env = setup(t);
+  engine.load(station);
+  env.advance(1000);
+  assert.equal(env.audios[0].volume, 1);
+
+  engine.fadeOut(1000);
+  env.advance(500);
+  assert.ok(env.audios[0].volume < 1 && env.audios[0].volume > 0);
+
+  env.advance(500);
+  assert.equal(env.audios[0].volume, 0);
+
+  engine.load({ ...station, id: "after-fade" });
+  assert.equal(env.audios[1].volume, 1, "换台要把淡出乘子复位");
+});
+
+test("用户调音量会取消正在进行的淡出", (t) => {
+  const env = setup(t);
+  engine.load(station);
+  env.advance(1000);
+
+  engine.fadeOut(1000);
+  env.advance(500);
+  engine.setVolume(0.8, false);
+
+  env.advance(500);
+  assert.equal(env.audios[0].volume, 0.8, "淡出被取消后音量保持不变");
+});
+
 test("播放被浏览器拒绝也会清理阈值提醒和连接超时", async (t) => {
   const env = setup(t);
   globalThis.Audio.prototype.play = () => Promise.reject(new DOMException("blocked", "NotAllowedError"));

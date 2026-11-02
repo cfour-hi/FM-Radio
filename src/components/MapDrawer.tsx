@@ -1,6 +1,9 @@
 import { memo, useDeferredValue, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DrawerBrowse from "./drawer/DrawerBrowse";
 import DrawerFilters from "./drawer/DrawerFilters";
+import DrawerHidden from "./drawer/DrawerHidden";
 import DrawerMultiList from "./drawer/DrawerMultiList";
+import { buildBrowseGroups } from "../lib/browseGroups";
 import DrawerNearby from "./drawer/DrawerNearby";
 import DrawerResults from "./drawer/DrawerResults";
 import DrawerSearchBar from "./drawer/DrawerSearchBar";
@@ -10,7 +13,7 @@ import { buildLocalGroups, nearbyQueue, type LocalGroups } from "../lib/localFro
 import { loadMapCatalog } from "../lib/mapStations";
 import { languageOptions, matchesFilters } from "../lib/stationDiscovery";
 import { searchStations } from "../lib/stationSearch";
-import { checkSupport } from "../lib/capability";
+import { isPlayable } from "../lib/stationFilter";
 import type { Station } from "../lib/types";
 import { useLibrary } from "../store/library";
 import { usePlayer } from "../store/player";
@@ -50,6 +53,9 @@ type Props = {
   onClearMulti: () => void;
   /** 每 +1 就把焦点送进搜索框（全局「/」用；抽屉没开时由页面先打开它） */
   searchFocusToken?: number;
+  /** 深链 ?c=&p= 时直接落在「国家」tab */
+  initialTab?: Tab | undefined;
+  browseSeed?: { country: string; province: string | null } | null;
 };
 
 /** 少于此字数不拉全球目录（无坐标台），先只搜地图上已有的电台。 */
@@ -74,6 +80,8 @@ function DrawerContent({
   multiStations,
   onClearMulti,
   searchFocusToken = 0,
+  initialTab,
+  browseSeed = null,
 }: Props) {
   const { where, loading: locating, error: locationError,
     selectProvince, requestBrowserLocation } = useWhereAmI();
@@ -81,10 +89,13 @@ function DrawerContent({
     typeof navigator !== "undefined" && Boolean(navigator.geolocation);
   const favorites = useLibrary((s) => s.favorites);
   const recents = useLibrary((s) => s.recents);
+  const hidden = useLibrary((s) => s.hidden);
+  const hiddenIds = useLibrary((s) => s.hiddenIds);
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
 
-  const [tab, setTab] = useState<Tab>("nearby");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "nearby");
+  const [hiddenView, setHiddenView] = useState(false);
   const [visibleCount, setVisibleCount] = useState(50);
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("");
@@ -100,7 +111,7 @@ function DrawerContent({
    * 一个字的命中面太大：1.45MB 的全球目录换不来几条有用的结果。
    * 筛选是显式操作，用户已经知道自己在缩小范围，这时才按需加载整份目录。
    */
-  const catalogEligible = filtering || q.length >= CATALOG_MIN_QUERY;
+  const catalogEligible = filtering || q.length >= CATALOG_MIN_QUERY || tab === "browse";
   useEffect(() => { setVisibleCount(50); }, [q, language, genre, tab]);
   /*
    * 退场这 180ms 里元素还看得见，内容必须留着。
@@ -114,13 +125,18 @@ function DrawerContent({
   const needsNearby = live && !multiStations?.length && showNearby;
   const province = where?.source === "manual" ? where.province : null;
   const capital = province ? (capitals.get(province) ?? "") : "";
+  /* 附近、推荐、搜索都排除隐藏台；收藏与最近仍显示，但会标注 */
+  const visibleStations = useMemo(
+    () => stations.filter((s) => !hiddenIds.has(s.id)),
+    [stations, hiddenIds],
+  );
   const groups: LocalGroups | null = useMemo(
-    () => (needsNearby && province ? buildLocalGroups(stations, province, null, capital) : null),
-    [needsNearby, stations, province, capital],
+    () => (needsNearby && province ? buildLocalGroups(visibleStations, province, null, capital) : null),
+    [needsNearby, visibleStations, province, capital],
   );
   const nearest = useMemo(
-    () => needsNearby && where?.source === "browser" ? nearestStations(stations, where.geo) : [],
-    [needsNearby, stations, where],
+    () => needsNearby && where?.source === "browser" ? nearestStations(visibleStations, where.geo) : [],
+    [needsNearby, visibleStations, where],
   );
   const nearbyItems = useMemo(
     () => groups ? nearbyQueue(groups) : nearest.map((item) => item.station),
@@ -152,7 +168,16 @@ function DrawerContent({
 
   const allStations = useMemo(() => [...new Map([...stations, ...(catalog ?? [])].map((s) => [s.id, s])).values()], [stations, catalog]);
   const languages = useMemo(() => languageOptions(allStations), [allStations]);
-  const eligible = useMemo(() => allStations.filter((s) => matchesFilters(s, language, genre)), [allStations, language, genre]);
+  const eligible = useMemo(
+    () => allStations.filter((s) => !hiddenIds.has(s.id) && matchesFilters(s, language, genre)),
+    [allStations, hiddenIds, language, genre],
+  );
+  const browsing = tab === "browse" && !searching;
+  const browseStations = useMemo(
+    () => allStations.filter((s) => !hiddenIds.has(s.id)),
+    [allStations, hiddenIds],
+  );
+  const browseCountries = useMemo(() => buildBrowseGroups(browseStations), [browseStations]);
   const results = useMemo(() => {
     if (!live || !searching) return { hits: [] as Station[], regionTotal: 0, total: 0 };
     if (deferredQuery) {
@@ -169,13 +194,17 @@ function DrawerContent({
       if (event.key !== "Escape") return;
       // 原生 dialog 在 top layer 时，Esc 归它自己管，别一次关两层
       if (document.querySelector("dialog[open]")) return;
+      if (hiddenView) {
+        setHiddenView(false);
+        return;
+      }
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
       onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, hiddenView]);
 
   /* 键盘浏览：↑↓ 移动、Enter 播放。输入框里的一串键不会漏给全局快捷键。 */
   const [active, setActive] = useState(-1);
@@ -200,12 +229,12 @@ function DrawerContent({
   /* 搜不到时垫三个真能播的热门台，别让人停在死胡同里 */
   const topPicks = useMemo(
     () =>
-      stations
-        .filter((s) => !s.sslError && checkSupport(s).ok)
+      visibleStations
+        .filter((s) => isPlayable(s, hiddenIds))
         .slice()
         .sort((a, b) => b.clicks - a.clicks)
         .slice(0, 3),
-    [stations],
+    [visibleStations, hiddenIds],
   );
 
   /*
@@ -265,6 +294,21 @@ function DrawerContent({
     className: DRAWER_ROOT,
   } as const;
 
+  /* 已隐藏的台：恢复入口，盖过 tab 与搜索 */
+  if (hiddenView) {
+    return (
+      <div {...rootProps} role="dialog" aria-label="已隐藏的电台">
+        <DrawerHidden
+          entries={hidden}
+          onBack={() => setHiddenView(false)}
+          onClose={onClose}
+          onRestore={(id) => useLibrary.getState().unhideStation(id)}
+          onRestoreAll={() => useLibrary.getState().unhideAllStations()}
+        />
+      </div>
+    );
+  }
+
   /* 多命中视图：地图上点到的重叠台，抽屉只列这几个，盖过 tab 与搜索 */
   if (multiStations && multiStations.length > 0) {
     return (
@@ -321,21 +365,24 @@ function DrawerContent({
           setQuery("");
           setLanguage("");
           setGenre("");
+          setHiddenView(false);
         }}
       />
 
-      <DrawerFilters
-        languages={languages}
-        language={language}
-        genre={genre}
-        filtering={filtering}
-        onLanguage={setLanguage}
-        onGenre={setGenre}
-        onClear={() => {
-          setLanguage("");
-          setGenre("");
-        }}
-      />
+      {!browsing && (
+        <DrawerFilters
+          languages={languages}
+          language={language}
+          genre={genre}
+          filtering={filtering}
+          onLanguage={setLanguage}
+          onGenre={setGenre}
+          onClear={() => {
+            setLanguage("");
+            setGenre("");
+          }}
+        />
+      )}
 
       {searching && (
         <div role="status" className="border-b border-line px-4 py-2 text-[12px] text-dim">
@@ -349,6 +396,19 @@ function DrawerContent({
             </>
           )}
           {catalog === null && !catalogEligible ? "地图电台" : "全部电台"} · {results.total} 个结果 · 已显示 {items.length} 个
+        </div>
+      )}
+
+      {browsing && (catalog === null || catalogError) && (
+        <div role="status" className="border-b border-line px-4 py-2 text-[12px] text-dim">
+          {catalogError ? (
+            <>
+              完整目录加载失败，仅显示已加载电台。
+              <button type="button" onClick={() => setCatalogRetry((n) => n + 1)} className="ml-2 text-signal">重试</button>
+            </>
+          ) : (
+            "正在补全目录…"
+          )}
         </div>
       )}
 
@@ -366,21 +426,41 @@ function DrawerContent({
         />
       )}
 
-      <DrawerResults
-        items={items}
-        active={active}
-        searching={searching}
-        deferredQuery={deferredQuery}
-        emptyText={emptyText}
-        showNearby={showNearby}
-        whereSource={where?.source ?? null}
-        distanceNotes={distanceNotes}
-        topPicks={topPicks}
-        filtering={filtering}
-        total={results.total}
-        onPickStation={onPickStation}
-        onLoadMore={() => setVisibleCount((count) => count + 50)}
-      />
+      {browsing ? (
+        <DrawerBrowse
+          stations={browseStations}
+          countries={browseCountries}
+          seed={browseSeed}
+          onPickStation={onPickStation}
+        />
+      ) : (
+        <DrawerResults
+          items={items}
+          active={active}
+          searching={searching}
+          deferredQuery={deferredQuery}
+          emptyText={emptyText}
+          showNearby={showNearby}
+          whereSource={where?.source ?? null}
+          distanceNotes={distanceNotes}
+          topPicks={topPicks}
+          filtering={filtering}
+          total={results.total}
+          hiddenIds={hiddenIds}
+          onPickStation={onPickStation}
+          onLoadMore={() => setVisibleCount((count) => count + 50)}
+        />
+      )}
+
+      {hidden.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setHiddenView(true)}
+          className="min-h-11 shrink-0 border-t border-line px-4 text-left text-[12px] text-dim transition-colors hover:text-ink"
+        >
+          已隐藏 {hidden.length} 个 · 管理
+        </button>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { hasAlternative } from "../lib/stationAlternatives";
 import { useDragGesture } from "../hooks/useDragGesture";
 import { useIsCompact } from "../hooks/useIsCompact";
 import { usePlayer } from "../store/player";
+import { useLibrary } from "../store/library";
 import { useMapStore } from "../store/map";
 import { DesktopControls, MobileControls } from "./player/PlayerControls";
 import MiniPlayer from "./player/MiniPlayer";
@@ -43,6 +44,8 @@ export default function PlayerBar() {
   const next = usePlayer((s) => s.next);
   const retry = usePlayer((s) => s.retry);
   const errorAlternative = usePlayer((s) => s.errorAlternative);
+  const autoSwitchNotice = usePlayer((s) => s.autoSwitchNotice);
+  const undoAutoSwitch = usePlayer((s) => s.undoAutoSwitch);
   const focusStation = useMapStore((s) => s.focusStation);
 
   const playing = status === "playing" || status === "tuning" || status === "buffering";
@@ -257,8 +260,14 @@ export default function PlayerBar() {
             failedForAutoplay={failedForAutoplay}
             canSwap={canSwap}
             queue={queue}
+            notice={autoSwitchNotice ? { from: autoSwitchNotice.from, to: autoSwitchNotice.to } : null}
             onRetry={retry}
             onErrorAlternative={errorAlternative}
+            onHideStation={() => {
+              useLibrary.getState().hideStation(station, errorKind ?? "manual");
+              usePlayer.getState().errorAlternative();
+            }}
+            onUndoAutoSwitch={undoAutoSwitch}
           />
         </div>
 

@@ -1,7 +1,8 @@
-export type Tab = "nearby" | "favorites" | "recents" | "search";
+export type Tab = "search" | "browse" | "nearby" | "favorites" | "recents";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "search", label: "全部" },
+  { key: "browse", label: "国家" },
   { key: "nearby", label: "附近" },
   { key: "favorites", label: "收藏" },
   { key: "recents", label: "最近" },

@@ -6,13 +6,15 @@ import Starfield from "../components/Starfield";
 import MapDrawer from "../components/MapDrawer";
 import FirstRunGuide, { type GuideAction } from "../components/FirstRunGuide";
 import { loadMapCatalog, loadMapCore, loadMapRest, type CoreMeta, type MapDataset } from "../lib/mapStations";
-import { readStationId } from "../lib/deepLink";
+import { readCountryCode, readProvince, readStationId } from "../lib/deepLink";
 import { isGuideForced, shouldShowGuide } from "../lib/onboarding";
 import { prefersReducedMotion } from "../lib/motion";
 import type { Station } from "../lib/types";
 import { useMapStore } from "../store/map";
 import { useFxStore } from "../store/fx";
+import { useLibrary } from "../store/library";
 import { usePlayer, readLastStation } from "../store/player";
+import { isPlayable } from "../lib/stationFilter";
 
 /*
  * MapLibre 那一坨接近 300KB gzip，是首页里最重的一块。
@@ -58,6 +60,15 @@ export default function MapPage() {
   /** 分享链接点名的台；读一次就定，后续 URL 变化不重新解析 */
   const deepId = useMemo(() => readStationId(), []);
   const deepDone = useRef<string | null>(null);
+  /** 深链 ?c=&p=：直接打开「国家」tab，并尽量把镜头对准该地区 */
+  const deepCountry = useMemo(() => readCountryCode(), []);
+  const deepProvince = useMemo(() => readProvince(), []);
+  const browseSeed = useMemo(
+    () => (deepCountry ? { country: deepCountry, province: deepProvince } : null),
+    [deepCountry, deepProvince],
+  );
+  const deepBrowseOpened = useRef(false);
+  const deepFocused = useRef(false);
   /**
    * 台名默认开着。
    *
@@ -99,6 +110,7 @@ export default function MapPage() {
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
   const currentId = usePlayer((s) => s.station?.id ?? null);
+  const hiddenIds = useLibrary((s) => s.hiddenIds);
 
   useEffect(() => {
     let alive = true;
@@ -170,8 +182,8 @@ export default function MapPage() {
     // 上线前就用过站的人没有引导标记但有上次电台，视为「已上手」不再打扰；
     // 但 ?guide=1 是明确要求重看，不能被这层迁移规则拦掉。
     if (!isGuideForced() && readLastStation()) return;
-    // 分享链接点名了某个台：别用一张欢迎卡盖住它
-    if (readStationId() && !isGuideForced()) return;
+    // 分享链接点名了某个台/地区：别用一张欢迎卡盖住它
+    if ((readStationId() || readCountryCode()) && !isGuideForced()) return;
     setGuideOpen(true);
   }, [data, loadError, mapError]);
 
@@ -235,13 +247,13 @@ export default function MapPage() {
 
   const randomOnMap = useCallback(() => {
     if (stations.length === 0) return;
-    // 只在图上点得亮的台里挑，避开证书异常的那些
-    const pool = stations.filter((s) => !s.sslError);
+    // 只在图上点得亮、且没有被本地隐藏的台里挑
+    const pool = stations.filter((s) => isPlayable(s, hiddenIds));
     const pick = pool[Math.floor(Math.random() * pool.length)];
     if (!pick) return;
     flyToStation(pick);
     playStation(pick);
-  }, [stations, flyToStation, playStation]);
+  }, [stations, hiddenIds, flyToStation, playStation]);
 
   /* 引导收尾：random 时在同一手势任务内播放，避免被自动播放策略拦截 */
   const finishGuide = useCallback(
@@ -286,6 +298,31 @@ export default function MapPage() {
       })
       .catch(() => setLinkMiss(true));
   }, [deepId, data, play, focusStation]);
+
+  /*
+   * 国家/地区深链：数据到齐后打开抽屉的「国家」tab，并用匹配电台的质心
+   * 把镜头对准该地区。只有 catalog 的国家没有坐标，只打开列表。
+   */
+  useEffect(() => {
+    if (!deepCountry || !data) return;
+    if (!deepBrowseOpened.current) {
+      deepBrowseOpened.current = true;
+      setDrawerOpen(true);
+    }
+    if (deepFocused.current) return;
+
+    const matches = data.stations.filter((station) =>
+      station.countryCode.toUpperCase() === deepCountry &&
+      (!deepProvince || station.province === deepProvince) &&
+      station.geo && station.geo.lat !== 0 && station.geo.lon !== 0,
+    );
+    if (matches.length === 0) return;
+
+    deepFocused.current = true;
+    const lat = matches.reduce((sum, station) => sum + (station.geo?.lat ?? 0), 0) / matches.length;
+    const lon = matches.reduce((sum, station) => sum + (station.geo?.lon ?? 0), 0) / matches.length;
+    focusStation({ lat, lon });
+  }, [deepCountry, deepProvince, data, focusStation]);
 
   useEffect(() => {
     if (!linkMiss) return;
@@ -511,6 +548,8 @@ export default function MapPage() {
         multiStations={multiStations}
         onClearMulti={clearMulti}
         searchFocusToken={searchFocusToken}
+        initialTab={browseSeed ? "browse" : undefined}
+        browseSeed={browseSeed}
       />
 
       {/* 分享链接里的台找不到：一句轻提示，四秒后自己消失，不弹窗 */}
