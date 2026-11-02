@@ -1,27 +1,27 @@
 {
   "v": 1,
-  "tag": "data-2026-11-02-50ad47f3",
+  "tag": "data-2026-11-02-71275eaf",
   "generatedAt": "2026-11-02",
   "counts": {
     "core": 2302,
-    "rest": 7852,
+    "rest": 7864,
     "catalog": 22664
   },
   "files": [
     {
       "name": "stations-core.json",
-      "bytes": 1194935,
-      "sha256": "4a4d748f008c23594724fa7ef1e0c2842fe80698c7cf104436189087d449be03"
+      "bytes": 913686,
+      "sha256": "9e8ac743d63c23a72ebcc6b4eda0d412936945f22f14dfb210c4f57c0dc45c03"
     },
     {
       "name": "stations-rest.json",
-      "bytes": 3017334,
-      "sha256": "b69f24fede26d0c7ac12a2203897d3c40a26244730462b8dfbd07d36c0689c79"
+      "bytes": 3023285,
+      "sha256": "cd62408ba018703c0b3a1252b8101cc0b7316db96aa50e6b0419e5831b98d671"
     },
     {
       "name": "stations-catalog.json",
-      "bytes": 5692402,
-      "sha256": "3a3ccaac94df0d9f27076459a2de5673b45e5da0ce8ab37659b2e2863d55cd75"
+      "bytes": 3867344,
+      "sha256": "15581aa22b57e0f392e7800fe9cdd2e65ceab1f73e34b65765e107d1b569ecc7"
     }
   ]
 }
